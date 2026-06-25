@@ -22,9 +22,9 @@ body {
    NAVBAR
    ===================== */
 .pos-navbar {
-    background: #3c4a3e;
+    background: #0F172A;
     /* Olive Grove Deep */
-    height: 76px;
+    height: 116px;
     padding: 0 14px;
     position: fixed;
     top: 0;
@@ -39,8 +39,8 @@ body {
 
 /* Brand icon box – white square with arrow */
 .brand-icon-box {
-    width: 46px;
-    height: 46px;
+    width: 100px;
+    height: 100px;
     background: transparent;
     border-radius: 4px;
     display: flex;
@@ -55,7 +55,7 @@ body {
 }
 
 .brand-name {
-    font-size: 1.35rem;
+    font-size: 2.5rem;
     font-weight: 700;
     color: #fff;
     line-height: 1.15;
@@ -63,15 +63,15 @@ body {
 }
 
 .brand-sub {
-    font-size: 0.7rem;
-    color: #ebd8b3;
+    font-size: 0.9rem;
+    color: #E2E8F0;
     /* Sandstone Cream */
     line-height: 1;
 }
 
 .navbar-datetime {
-    font-size: 0.7rem;
-    color: #ebd8b3;
+    font-size: 0.9rem;
+    color: #E2E8F0;
     /* Sandstone Cream */
     text-align: right;
     line-height: 1.5;
@@ -79,8 +79,8 @@ body {
 }
 
 .btn-txn-history {
-    background: #5c6b52;
-    /* Olive Accent */
+    background: #06B6D4;
+    /* Cyan */
     color: #fff;
     border: none;
     font-size: 0.78rem;
@@ -92,13 +92,13 @@ body {
 }
 
 .btn-txn-history:hover {
-    background: #72826a;
-    /* Olive Hover */
+    background: #0891B2;
+    /* Cyan Hover */
     color: #fff;
 }
 
 .btn-logout {
-    background: #9e4733;
+    background: #F97316;
     /* Rust Red */
     color: #fff;
     border: none;
@@ -110,7 +110,7 @@ body {
 }
 
 .btn-logout:hover {
-    background: #b85842;
+    background: #EA580C;
     /* Light Rust */
     color: #fff;
 }
@@ -120,8 +120,8 @@ body {
    ===================== */
 .pos-layout {
     display: flex;
-    height: calc(100vh - 76px);
-    margin-top: 76px;
+    height: calc(100vh - 116px);
+    margin-top: 116px;
     overflow: hidden;
     background: #fff;
 }
@@ -146,8 +146,8 @@ body {
 .pos-services-panel {
     flex: 1.7;
     min-width: 0;
-    background: #f6f4ee;
-    /* Sandstone Light */
+    background: #F1F5F9;
+    /* App Background */
     border-right: 1px solid #dcd3c4;
     /* Sandstone Gray */
     display: flex;
@@ -158,34 +158,32 @@ body {
 .services-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    /* no gap – cells touch, border-based separation */
+    gap: 20px;
+    padding: 20px;
+    flex: 1; /* Stretch inside parent */
+    grid-auto-rows: 1fr; /* Make rows stretch equally */
 }
 
 .service-card {
     background: #fff;
-    border-right: 1px solid #dcd3c4;
-    /* Sandstone Gray */
-    border-bottom: 1px solid #dcd3c4;
-    /* Sandstone Gray */
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 22px 10px 18px;
     cursor: pointer;
-    min-height: 150px;
-    gap: 10px;
-    transition: background 0.12s;
-}
-
-/* remove double-border on every 3rd col */
-.service-card:nth-child(3n) {
-    border-right: none;
+    height: 100%;
+    gap: 15px;
+    transition: all 0.2s ease;
 }
 
 .service-card:hover {
-    background: #ebd8b3;
-    /* Sandstone Cream Hover */
+    background: #F8FAFC;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
 .service-card-icon {
@@ -240,7 +238,7 @@ body {
 }
 
 .btn-clear-all {
-    background: #c0392b;
+    background: #F97316;
     color: #fff;
     font-size: 0.68rem;
     font-weight: 700;
@@ -252,15 +250,15 @@ body {
 }
 
 .btn-clear-all:hover {
-    background: #e04030;
+    background: #EA580C;
 }
 
 /* Order items list */
 .order-items-list {
     flex: 1;
     overflow-y: auto;
-    background: #f6f4ee;
-    /* Sandstone Light */
+    background: #F1F5F9;
+    /* App Background */
     padding: 8px 10px;
     display: flex;
     flex-direction: column;
@@ -328,7 +326,7 @@ body {
 
 .order-item-card-variant {
     font-size: 0.72rem;
-    color: #5c6b52;
+    color: #06B6D4;
     margin-top: 1px;
     font-weight: 500;
 }
@@ -342,7 +340,7 @@ body {
 
 .order-item-tag {
     background: #f0ece3;
-    color: #5c6b52;
+    color: #06B6D4;
     font-size: 0.64rem;
     font-weight: 600;
     border-radius: 3px;
@@ -389,12 +387,12 @@ body {
 }
 
 .qty-step-btn {
-    background: #f6f4ee;
+    background: #F1F5F9;
     border: none;
     width: 30px;
     height: 28px;
     font-size: 1rem;
-    color: #3c4a3e;
+    color: #0F172A;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -405,8 +403,8 @@ body {
 }
 
 .qty-step-btn:hover {
-    background: #ebd8b3;
-    color: #3c4a3e;
+    background: #E2E8F0;
+    color: #0F172A;
 }
 
 .qty-step-input {
@@ -434,7 +432,7 @@ body {
 .order-item-remove-btn {
     background: none;
     border: none;
-    color: #c0392b;
+    color: #F97316;
     font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
@@ -484,14 +482,14 @@ body {
     cursor: pointer;
     transition: background 0.13s;
     text-transform: uppercase;
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
 }
 
 .btn-place-order:hover {
-    background: #4f6d5a;
-    /* Medium Olive */
+    background: #1E293B;
+    /* Medium Navy */
 }
 
 /* Print Receipt button in its new location */
@@ -510,15 +508,15 @@ body {
     cursor: pointer;
     transition: background 0.13s;
     text-transform: uppercase;
-    background: #5c6b52;
+    background: #06B6D4;
     /* Slate Olive */
     color: #fff;
     width: 100%;
 }
 
 .btn-print-receipt:hover {
-    background: #72826a;
-    /* Olive Hover */
+    background: #0891B2;
+    /* Cyan Hover */
 }
 
 /* =====================
@@ -616,13 +614,13 @@ body {
 }
 
 .step-circle.active {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
 }
 
 .step-circle.done {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
 }
 
 .step-label {
@@ -642,8 +640,8 @@ body {
 }
 
 .step-line.active {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
 }
 
 /* ---- Modal body ---- */
@@ -671,8 +669,8 @@ body {
 }
 
 .variant-card {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
     border-radius: 4px;
     padding: 0 14px;
@@ -690,15 +688,15 @@ body {
 }
 
 .variant-card:hover {
-    border-color: #4f6d5a;
-    /* Medium Olive */
+    border-color: #1E293B;
+    /* Medium Navy */
 }
 
 .variant-card.selected {
-    border-color: #ebd8b3;
+    border-color: #E2E8F0;
     /* Sandstone Selected border */
-    background: #213027;
-    /* Dark Olive */
+    background: #020617;
+    /* Darker Navy */
 }
 
 /* Option cards (Grid for uniform card sizes) */
@@ -729,22 +727,22 @@ body {
 }
 
 .option-card:hover {
-    border-color: #3c4a3e;
-    /* Deep Olive */
-    color: #3c4a3e;
+    border-color: #0F172A;
+    /* Dark Navy */
+    color: #0F172A;
 }
 
 .option-card.selected {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
-    border-color: #3c4a3e;
+    border-color: #0F172A;
 }
 
 /* Modal item total bar */
 .modal-footer-bar {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
     display: flex;
     align-items: center;
@@ -787,8 +785,8 @@ body {
 }
 
 .btn-modal-next {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
     border: none;
     font-size: 0.8rem;
@@ -798,8 +796,8 @@ body {
 }
 
 .btn-modal-next:hover {
-    background: #4f6d5a;
-    /* Medium Olive */
+    background: #1E293B;
+    /* Medium Navy */
     color: #fff;
 }
 
@@ -855,20 +853,20 @@ body {
 }
 
 .qty-btn.plus {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
-    border-color: #3c4a3e;
+    border-color: #0F172A;
 }
 
 .qty-btn:hover {
-    background: #f6f4ee;
-    /* Sandstone Light */
+    background: #F1F5F9;
+    /* App Background */
 }
 
 .qty-btn.plus:hover {
-    background: #213027;
-    /* Dark Olive */
+    background: #020617;
+    /* Darker Navy */
 }
 
 .qty-display {
@@ -954,7 +952,7 @@ body {
 }
 
 .numpad-btn-clear {
-    color: #c0392b;
+    color: #F97316;
 }
 
 .numpad-btn-bksp {
@@ -962,8 +960,8 @@ body {
 }
 
 .btn-lookup {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
     border: none;
     font-size: 0.76rem;
@@ -974,8 +972,8 @@ body {
 }
 
 .btn-lookup:hover {
-    background: #4f6d5a;
-    /* Medium Olive */
+    background: #1E293B;
+    /* Medium Navy */
 }
 
 .payment-confirm-bar {
@@ -984,8 +982,8 @@ body {
 
 .btn-confirm-payment {
     width: 100%;
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
     border: none;
     border-radius: 0 0 5px 5px;
@@ -997,8 +995,8 @@ body {
 }
 
 .btn-confirm-payment:hover {
-    background: #4f6d5a;
-    /* Medium Olive */
+    background: #1E293B;
+    /* Medium Navy */
 }
 
 /* =====================
@@ -1029,8 +1027,8 @@ body {
 
 .btn-receipt-close {
     width: 100%;
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
     border: none;
     border-radius: 0 0 5px 5px;
@@ -1042,8 +1040,8 @@ body {
 }
 
 .btn-receipt-close:hover {
-    background: #4f6d5a;
-    /* Medium Olive */
+    background: #1E293B;
+    /* Medium Navy */
     color: #fff;
 }
 
@@ -1055,17 +1053,17 @@ body {
 }
 
 .txn-table thead th {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
     font-weight: 600;
-    border-color: #4f6d5a;
-    /* Medium Olive */
+    border-color: #1E293B;
+    /* Medium Navy */
 }
 
 .btn-view-txn {
-    background: #3c4a3e;
-    /* Deep Olive */
+    background: #0F172A;
+    /* Dark Navy */
     color: #fff;
     border: none;
     font-size: 0.7rem;
@@ -1075,8 +1073,8 @@ body {
 }
 
 .btn-view-txn:hover {
-    background: #4f6d5a;
-    /* Medium Olive */
+    background: #1E293B;
+    /* Medium Navy */
 }
 
 /* ---- SCROLLBAR ---- */

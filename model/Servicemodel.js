@@ -60,8 +60,19 @@ const OrderModel = (() => {
             date: now.toISOString().slice(0, 10),
             time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
         };
+        
         clearOrder();
         return txn;
+    }
+
+    function getTransactions() {
+        // Will be retrieved from database later
+        return [];
+    }
+
+    function getTransactionByNum(num) {
+        // Will be retrieved from database later
+        return null;
     }
 
     return {
@@ -73,5 +84,7 @@ const OrderModel = (() => {
         isEmpty,
         updateQty,
         placeOrder,
+        getTransactions,
+        getTransactionByNum,
     };
 })();

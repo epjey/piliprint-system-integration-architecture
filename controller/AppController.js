@@ -22,6 +22,7 @@ function init() {
     document.getElementById('btnPrintReceipt').addEventListener('click', handlePrintReceipt);
     document.getElementById('btnTransactionHistory').addEventListener('click', handleShowTransactionHistory);
     document.getElementById('btnLogout').addEventListener('click', handleLogout);
+    document.getElementById('btnExportCSV').addEventListener('click', handleExportCSV);
 
     // 4. Start Navbar Datetime ticker
     startDatetimeTicker();
@@ -160,43 +161,87 @@ function showReceiptModal(txn) {
 
 // Print receipt action (just print preview or message)
 function handlePrintReceipt() {
-    const items = OrderModel.getItems();
-    const total = OrderModel.getTotal();
+    const receiptPreview = document.getElementById('receiptPreview');
+    const receiptContent = receiptPreview ? receiptPreview.textContent.trim() : "";
     
-    if (items.length === 0) {
+    if (!receiptContent) {
         Swal.fire({
             icon: 'info',
-            title: 'No Items',
-            text: 'There is no current order to print.',
+            title: 'No Receipt',
+            text: 'There is no current order or transaction receipt to print.',
             confirmButtonColor: '#2e4a6e'
         });
         return;
     }
     
     // Trigger browser print of the receipt preview content
-    const receiptContent = document.getElementById('receiptPreview').textContent;
     const printWindow = window.open('', '_blank', 'width=600,height=600');
-    printWindow.document.write('<pre style="font-family:monospace;font-size:12px;padding:20px;">' + receiptContent + '</pre>');
+    printWindow.document.write('<pre style="font-family:monospace;font-size:12px;padding:20px;">' + receiptPreview.textContent + '</pre>');
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
     printWindow.close();
 }
 
+// Export transaction history to CSV
+function handleExportCSV() {
+    const txns = OrderModel.getTransactions();
+    if (txns.length === 0) {
+        Swal.fire({
+            icon: 'info',
+            title: 'No Transactions',
+            text: 'There are no transactions available to export.',
+            confirmButtonColor: '#2e4a6e'
+        });
+        return;
+    }
+
+    // CSV Headers
+    let csv = "Order #,Items Summary,Customer,Total (PHP),Date & Time\n";
+
+    txns.forEach(t => {
+        const orderNum = `"${t.orderNum.replace(/"/g, '""')}"`;
+        const itemsSummary = `"${t.items.map(item => `${item.serviceName} (${item.qty}x)`).join(', ').replace(/"/g, '""')}"`;
+        const customer = `"${(t.customer || 'Walk-in').replace(/"/g, '""')}"`;
+        const total = `"${t.total.toFixed(2)}"`;
+        const dateTime = `"${t.date} ${t.time}"`;
+        csv += `${orderNum},${itemsSummary},${customer},${total},${dateTime}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `piliprint_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 // Show transaction history modal
 function handleShowTransactionHistory() {
-    const txns = OrderModel.getTransactions();
-    const tbody = document.getElementById('txnTableBody');
-    if (!tbody) return;
+    try {
+        const txns = OrderModel.getTransactions();
+        const tbody = document.getElementById('txnTableBody');
+        if (!tbody) {
+            console.error("tbody not found");
+            return;
+        }
 
-    tbody.innerHTML = '';
-    if (txns.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" class="text-center text-muted py-3">No transactions yet.</td>
-            </tr>
-        `;
-    } else {
+        // Check if jQuery and DataTables are loaded
+        if (typeof $ === 'undefined') {
+            Swal.fire("Error", "jQuery failed to load! Please check the file path.", "error");
+            return;
+        }
+
+        // Destroy existing DataTable if it has already been initialized
+        if ($.fn.DataTable.isDataTable('#txnTable')) {
+            $('#txnTable').DataTable().destroy();
+        }
+
+        tbody.innerHTML = '';
+        
         txns.forEach((t) => {
             const tr = document.createElement('tr');
             
@@ -210,7 +255,7 @@ function handleShowTransactionHistory() {
                 <td>₱${t.total.toFixed(2)}</td>
                 <td>${t.date} ${t.time}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary btn-view-txn" data-num="${t.orderNum}" style="background-color:#2e4a6e;border-color:#2e4a6e;font-size:0.7rem;padding:2px 8px;">View</button>
+                    <button class="btn btn-sm btn-primary btn-view-txn" data-num="${t.orderNum}" style="background-color:#0F172A;border-color:#0F172A;font-size:0.7rem;padding:4px 10px;">View</button>
                 </td>
             `;
             
@@ -226,10 +271,32 @@ function handleShowTransactionHistory() {
             
             tbody.appendChild(tr);
         });
-    }
 
-    const modal = new bootstrap.Modal(document.getElementById('txnHistoryModal'));
-    modal.show();
+        // Initialize DataTable with search, sorting, and pagination
+        $('#txnTable').DataTable({
+            "order": [[ 0, "desc" ]], // Sort by Order # descending initially
+            "pageLength": 5, // Keep pagination small for the modal
+            "lengthMenu": [5, 10, 25, 50],
+            "language": {
+                "emptyTable": "No transactions yet."
+            }
+        });
+
+        const modalEl = document.getElementById('txnHistoryModal');
+        if (!modalEl) {
+            Swal.fire("Error", "Modal HTML not found in index.html", "error");
+            return;
+        }
+        
+        let modal = bootstrap.Modal.getInstance(modalEl);
+        if (!modal) {
+            modal = new bootstrap.Modal(modalEl);
+        }
+        modal.show();
+    } catch (e) {
+        Swal.fire("Error", e.message, "error");
+        console.error(e);
+    }
 }
 
 // Handle Logout

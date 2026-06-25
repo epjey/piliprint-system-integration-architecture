@@ -26,8 +26,36 @@ const PaymentView = (() => {
         document.getElementById('contactNo').value = '';
         document.getElementById('lookupInput').value = '';
 
+        // Reset payment method selection to Cash on load
+        const paymentMethodSelect = document.getElementById('paymentMethod');
+        paymentMethodSelect.value = 'Cash';
+
         _modal = new bootstrap.Modal(document.getElementById('paymentModal'));
         _modal.show();
+
+        // Toggle visibility between Numpad and GCash QR
+        const togglePaymentMethodView = () => {
+            const method = paymentMethodSelect.value;
+            const qrContainer = document.getElementById('gcashQrContainer');
+            const numpadContainer = document.getElementById('numpadContainer');
+            const qrAmount = document.getElementById('gcashQrAmount');
+
+            if (method === 'GCash') {
+                qrContainer.style.display = 'block';
+                numpadContainer.style.display = 'none';
+                qrAmount.textContent = 'P ' + _total.toFixed(2);
+                _numStr = _total.toFixed(2);
+            } else {
+                qrContainer.style.display = 'none';
+                numpadContainer.style.display = 'block';
+                _numStr = '';
+            }
+            display.value = _numStr;
+            _updateChange();
+        };
+
+        paymentMethodSelect.onchange = togglePaymentMethodView;
+        togglePaymentMethodView();
 
         // Attach numpad
         document.querySelectorAll('.numpad-btn').forEach(btn => {
