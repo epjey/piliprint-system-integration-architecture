@@ -1,3 +1,4 @@
+<script>
 // ============================================================
 //  OrderView.php
 //  JavaScript served as a PHP file.
@@ -170,3 +171,5 @@ const OrderView = (() => {
 
     return { renderOrder, renderReceiptPreview, buildReceiptText };
 })();
+
+</script>

@@ -1,3 +1,4 @@
+<script>
 // ============================================================
 // VIEW: AdminView.js (served as .php)
 // Handles DOM updates for the admin dashboard
@@ -7,103 +8,515 @@ const AdminView = (() => {
 
 return {
 renderDashboard: (container) => {
-// Get stats from OrderModel (as an example)
+// Get stats from OrderModel
 const txns = typeof OrderModel !== 'undefined' ? OrderModel.getTransactions() : [];
-const totalRevenue = txns.reduce((sum, t) => sum + t.total, 0);
+const totalRevenue = txns.reduce((sum, t) => sum + (t.total || 0), 0);
+
+// Build monthly sales from real transaction data (last 6 months)
+const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const now = new Date();
+const months = [];
+const monthlyData = [];
+for (let i = 5; i >= 0; i--) {
+const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+months.push(monthNames[d.getMonth()]);
+const monthTotal = txns
+.filter(t => {
+const td = new Date(t.date || t.createdAt || null);
+return td.getFullYear() === d.getFullYear() && td.getMonth() === d.getMonth();
+})
+.reduce((sum, t) => sum + (t.total || 0), 0);
+monthlyData.push(monthTotal);
+}
+
+// Build service data from today's transactions
+const todayStr = new Date().toDateString();
+const svcCount = {};
+txns.forEach(t => {
+const td = new Date(t.date || t.createdAt || null);
+if (td.toDateString() !== todayStr) return;
+(t.items || []).forEach(item => {
+svcCount[item.name || item.service || 'Unknown'] = (svcCount[item.name || item.service || 'Unknown'] || 0) + (item.qty
+|| 1);
+});
+});
+const serviceLabels = Object.keys(svcCount).length ? Object.keys(svcCount) : ['No data'];
+const serviceData = Object.keys(svcCount).length ? Object.values(svcCount) : [0];
+
+// % change vs previous month
+const curMonth = monthlyData[monthlyData.length - 1];
+const prevMonth = monthlyData[monthlyData.length - 2] || 0;
+const pctChange = prevMonth > 0 ? (((curMonth - prevMonth) / prevMonth) * 100).toFixed(0) : (curMonth > 0 ? 100 : 0);
+const nowStr = new Date().toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, month: '2-digit',
+day: '2-digit', year: 'numeric' });
 
 container.innerHTML = `
-<div class="stat-grid mb-4">
-    <div class="stat-card">
-        <div class="stat-icon">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-        </div>
-        <div class="stat-info">
-            <span class="stat-label">Total Transactions</span>
-            <span class="stat-value">${txns.length}</span>
-        </div>
+<div style="padding:0;">
+    <!-- Welcome Header -->
+    <div style="margin-bottom:18px;">
+        <h2 style="font-size:1.6rem;font-weight:700;color:#0F172A;margin:0 0 2px;">Welcome back, Admin</h2>
+        <p style="color:#64748B;font-size:0.88rem;margin:0;">Here's what's happening today.</p>
     </div>
-    <div class="stat-card">
-        <div class="stat-icon" style="background:#DCFCE7;color:#15803D;">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="1" x2="12" y2="23"></line>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-        </div>
-        <div class="stat-info">
-            <span class="stat-label">Revenue Today</span>
-            <span class="stat-value">₱${totalRevenue.toFixed(2)}</span>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon" style="background:#FEF3C7;color:#B45309;">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-        </div>
-        <div class="stat-info">
-            <span class="stat-label">Active Users</span>
-            <span class="stat-value">4</span>
-        </div>
-    </div>
-</div>
 
-<div class="admin-card">
-    <div class="admin-card-title">Recent Activity</div>
-    <div style="color:#64748B;font-size:0.9rem;">
-        No recent activity recorded today.
+    <!-- Two-Panel Charts Row -->
+    <div style="display:flex;gap:20px;height:calc(100vh - 220px);">
+
+        <!-- LEFT: Monthly Sales Summary -->
+        <div class="admin-card" style="flex:1;min-width:0;display:flex;flex-direction:column;">
+            <div style="font-weight:700;font-size:0.95rem;color:#0F172A;margin-bottom:15px;">Monthly Sales Summary</div>
+            <div style="position:relative;flex:1;min-height:0;">
+                <canvas id="monthlySalesChart"></canvas>
+            </div>
+            <!-- Summary footer -->
+            <div style="display:flex;gap:0;border-top:1px solid #E2E8F0;margin-top:15px;">
+                <div style="flex:1;padding:15px 14px 5px;border-right:1px solid #E2E8F0;">
+                    <div style="font-size:1.1rem;font-weight:700;color:#2563EB;">₱${totalRevenue.toFixed(2)}</div>
+                    <div style="font-size:0.75rem;color:#64748B;margin-top:2px;">Total Due</div>
+                </div>
+                <div style="flex:1;padding:15px 14px 5px;border-right:1px solid #E2E8F0;">
+                    <div style="font-size:1.1rem;font-weight:700;color:#16A34A;">${pctChange > 0 ? '+' : ''}${pctChange}%
+                    </div>
+                    <div style="font-size:0.75rem;color:#64748B;margin-top:2px;">vs Last Month</div>
+                </div>
+                <div style="flex:1;padding:15px 14px 5px;">
+                    <div style="font-size:1.1rem;font-weight:700;color:#0F172A;">${txns.length}</div>
+                    <div style="font-size:0.75rem;color:#64748B;margin-top:2px;">Transactions</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Most Service Offered Today -->
+        <div class="admin-card" style="flex:1;min-width:0;display:flex;flex-direction:column;">
+            <div style="font-weight:700;font-size:0.95rem;color:#0F172A;margin-bottom:15px;">Most Service Offered Today
+            </div>
+            <div style="position:relative;flex:1;min-height:0;">
+                <canvas id="serviceChart"></canvas>
+            </div>
+            <!-- Empty footer layout to match the left side's height -->
+            <div style="display:flex;justify-content:flex-end;border-top:1px solid #E2E8F0;margin-top:15px;">
+                <div style="padding:15px 14px 5px;font-size:0.75rem;color:#64748B;">
+                    Updated today at ${nowStr}
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 `;
+
+// ---- Monthly Sales Bar Chart ----
+const ctx1 = document.getElementById('monthlySalesChart').getContext('2d');
+new Chart(ctx1, {
+type: 'bar',
+data: {
+labels: months,
+datasets: [{
+label: 'Amount (₱)',
+data: monthlyData,
+backgroundColor: '#4A7FB5',
+borderRadius: 4,
+borderSkipped: false,
+}]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+plugins: { legend: { display: false } },
+scales: {
+x: {
+title: { display: true, text: 'Month', font: { size: 11 }, color: '#64748B' },
+grid: { display: false },
+ticks: { color: '#64748B', font: { size: 11 } }
+},
+y: {
+title: { display: true, text: 'Amount (₱)', font: { size: 11 }, color: '#64748B' },
+beginAtZero: true,
+ticks: { color: '#64748B', font: { size: 11 } },
+grid: { color: '#F1F5F9' }
+}
+}
+}
+});
+
+// ---- Service Horizontal Bar Chart ----
+const ctx2 = document.getElementById('serviceChart').getContext('2d');
+const hasServiceData = serviceData.some(v => v > 0);
+new Chart(ctx2, {
+type: 'bar',
+data: {
+labels: serviceLabels,
+datasets: [{
+label: 'Orders',
+data: hasServiceData ? serviceData : [0, 0, 0, 0, 0],
+backgroundColor: '#4A7FB5',
+borderRadius: 4,
+}]
+},
+options: {
+indexAxis: 'y',
+responsive: true,
+maintainAspectRatio: false,
+plugins: {
+legend: { display: false },
+...(hasServiceData ? {} : {
+beforeDraw(chart) {
+const { ctx, width, height } = chart;
+ctx.save();
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillStyle = '#94A3B8';
+ctx.font = '13px Segoe UI';
+ctx.fillText('No Sales Today', width / 2, height / 2);
+ctx.restore();
+}
+})
+},
+scales: {
+x: {
+title: { display: true, text: 'Orders', font: { size: 11 }, color: '#64748B' },
+beginAtZero: true,
+ticks: { color: '#64748B', font: { size: 11 } },
+grid: { color: '#F1F5F9' }
+},
+y: {
+title: { display: true, text: 'Service', font: { size: 11 }, color: '#64748B' },
+ticks: { color: '#64748B', font: { size: 11 } },
+grid: { display: false }
+}
+}
+}
+});
 },
 
-renderServices: (container) => {
-container.innerHTML = `
-<div class="admin-card">
-    <div class="admin-card-title d-flex justify-content-between align-items-center">
-        <span>Manage Services</span>
-        <button class="btn btn-sm btn-primary" style="background:#0F172A;border-color:#0F172A;">+ Add Service</button>
-    </div>
-    <p style="color:#64748B;font-size:0.9rem;">This module will allow the admin to add, edit, or remove printing
-        services and variants.</p>
-</div>
-`;
+renderServices: (container, services = [], selectedServiceId = null, currentTab = 'variants') => {
+    const activeServices = services.filter(s => !s.isArchived);
+    if (!selectedServiceId && activeServices.length > 0) selectedServiceId = activeServices[0].id;
+    // selectedService can be from activeServices or if viewing an archived one directly
+    const selectedService = services.find(s => s.id == selectedServiceId) || null;
+
+    // Generate Left List
+    const serviceListHtml = activeServices.length > 0 
+        ? activeServices.map(s => `
+            <div class="service-list-item ${s.id == selectedServiceId ? 'active' : ''}" data-id="${s.id}" style="display:flex;align-items:center;padding:12px 20px;border-left:3px solid ${s.id == selectedServiceId ? '#0F172A' : 'transparent'};background:${s.id == selectedServiceId ? '#F1F5F9' : 'transparent'};border-bottom:1px solid #F1F5F9;cursor:pointer;">
+                <div style="width:36px;height:36px;background:#fff;border-radius:6px;border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:center;margin-right:12px;">
+                    ${(s.icon || '📦').startsWith('data:image') ? '<img src="' + s.icon + '" style="width:28px;height:28px;border-radius:4px;object-fit:cover;" />' : (s.icon || '📦').includes('<svg') ? '<div style="width:28px;height:28px;">' + s.icon + '</div>' : '<span style="font-size:1.2rem;">' + (s.icon || '📦') + '</span>'}
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:0.9rem;font-weight:600;color:#0F172A;">${s.name}</div>
+                    <div style="font-size:0.75rem;color:#94A3B8;">${s.variantsCount || 0}v · ${s.optionsCount || 0}opt</div>
+                </div>
+            </div>
+        `).join('')
+        : `<div style="padding: 20px; color: #94A3B8; text-align: center; font-size: 0.85rem;">No active services found.</div>`;
+
+    // Generate Right Side
+    let rightContentHtml = '';
+    
+    if (selectedService) {
+        // Tab generation logic
+        let tabBodyHtml = '';
+        let tabActionText = '';
+
+        if (currentTab === 'variants') {
+            tabActionText = 'Add Variant';
+            tabBodyHtml = (selectedService.variants && selectedService.variants.length > 0)
+                ? selectedService.variants.map((v, idx) => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;background:${idx % 2 === 0 ? '#FDFDFD' : '#fff'};border-bottom:1px solid #E2E8F0;">
+                        <div>
+                            <div style="font-size:0.9rem;font-weight:600;color:#0F172A;">${v.name}</div>
+                            <div style="font-size:0.8rem;color:#94A3B8;margin-top:2px;">Base price: ₱${parseFloat(v.basePrice || 0).toFixed(2)}</div>
+                        </div>
+                        <div style="display:flex;gap:15px;">
+                            <button class="btn-remove-item" data-id="${v.id}" data-type="variant" style="background:none;border:none;color:#EF4444;font-size:0.85rem;font-weight:600;cursor:pointer;">Remove</button>
+                        </div>
+                    </div>`).join('')
+                : `<div style="padding: 20px; color: #94A3B8; text-align: center; font-size: 0.85rem;">No variants found.</div>`;
+        } else if (currentTab === 'options') {
+            tabActionText = 'Add Option';
+            tabBodyHtml = (selectedService.optionGroups && selectedService.optionGroups.length > 0)
+                ? selectedService.optionGroups.map((g) => {
+                    const badgeColor = g.type === 'Page Tier' ? 'background:#FEF3C7;color:#D97706;' : 'background:#DBEAFE;color:#1D4ED8;';
+                    
+                    const optionsHtml = (g.options && g.options.length > 0)
+                        ? g.options.map(o => `
+                            <div class="option-item-box" data-group-id="${g.id}" data-option-id="${o.id}" style="background:#fff;border:1px solid #CBD5E1;border-radius:6px;padding:8px 16px;font-size:0.85rem;color:#0F172A;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 2px rgba(0,0,0,0.02);position:relative;">
+                                <span>${o.name}</span>
+                                ${parseFloat(o.price || 0) > 0 ? `<span style="color:#64748B;font-size:0.8rem;">(+₱${parseFloat(o.price).toFixed(1)})</span>` : ''}
+                                <span class="delete-option-item-x" style="color:#EF4444;font-weight:bold;margin-left:4px;">&times;</span>
+                            </div>
+                        `).join('')
+                        : '';
+                        
+                    return `
+                        <div class="option-group-card" style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin-bottom:15px;position:relative;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;">
+                                <div style="display:flex;align-items:center;">
+                                    <span style="font-weight:700;font-size:0.95rem;color:#0F172A;">${g.name}</span>
+                                    <span style="${badgeColor}padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;margin-left:10px;text-transform:uppercase;">${g.type || 'Choice'}</span>
+                                </div>
+                                <button class="btn-remove-group" data-id="${g.id}" style="background:none;border:none;color:#EF4444;font-size:0.85rem;font-weight:600;cursor:pointer;">Remove</button>
+                            </div>
+                            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                                ${optionsHtml}
+                                <button class="btn-add-option-item" data-group-id="${g.id}" style="background:none;border:1px dashed #CBD5E1;border-radius:6px;padding:8px 16px;font-size:0.85rem;color:#4A7FB5;font-weight:600;cursor:pointer;">+ Add Item</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')
+                : `<div style="padding: 20px; color: #94A3B8; text-align: center; font-size: 0.85rem;">No options found.</div>`;
+        } else if (currentTab === 'pricing') {
+            const hasVariants = selectedService.variants && selectedService.variants.length > 0;
+            
+            if (!hasVariants) {
+                tabBodyHtml = `<div style="padding: 30px; text-align: center; color: #64748B; font-size: 0.95rem;">
+                    Please add at least one variant to preview pricing.
+                </div>`;
+            } else {
+                // Initialize simulation state if not set or for a different service
+                if (!window.pricingSimulationState || window.pricingSimulationState.serviceId !== selectedService.id) {
+                    window.pricingSimulationState = {
+                        serviceId: selectedService.id,
+                        selectedVariantId: selectedService.variants[0].id,
+                        selectedOptionIds: {}
+                    };
+                    // Select first option of each group by default
+                    if (selectedService.optionGroups) {
+                        selectedService.optionGroups.forEach(g => {
+                            if (g.options && g.options.length > 0) {
+                                window.pricingSimulationState.selectedOptionIds[g.id] = g.options[0].id;
+                            }
+                        });
+                    }
+                }
+                
+                // Build Variants section
+                const variantButtons = selectedService.variants.map(v => {
+                    const isActive = window.pricingSimulationState.selectedVariantId == v.id;
+                    const activeStyle = isActive ? 'background:#4A7FB5;color:#fff;border-color:#4A7FB5;' : 'background:#fff;color:#0F172A;border-color:#CBD5E1;';
+                    return `<button class="sim-btn-variant" data-id="${v.id}" style="padding:10px 20px;font-size:0.9rem;font-weight:600;border-radius:6px;border:1px solid;${activeStyle}cursor:pointer;min-width:120px;text-align:center;transition:all 0.2s;">
+                        ${v.name} (₱${parseFloat(v.basePrice || 0).toFixed(1)})
+                    </button>`;
+                }).join('');
+                
+                // Build Option Groups section
+                let optionGroupsHtml = '';
+                if (selectedService.optionGroups && selectedService.optionGroups.length > 0) {
+                    optionGroupsHtml = selectedService.optionGroups.map(g => {
+                        const optionButtons = g.options.map(o => {
+                            const isActive = window.pricingSimulationState.selectedOptionIds[g.id] == o.id;
+                            const activeStyle = isActive ? 'background:#D97706;color:#fff;border-color:#D97706;' : 'background:#fff;color:#0F172A;border-color:#CBD5E1;';
+                            const priceText = parseFloat(o.price || 0) > 0 ? ` (+₱${parseFloat(o.price).toFixed(1)})` : '';
+                            return `<button class="sim-btn-option" data-group-id="${g.id}" data-option-id="${o.id}" style="padding:10px 20px;font-size:0.9rem;font-weight:600;border-radius:6px;border:1px solid;${activeStyle}cursor:pointer;min-width:120px;text-align:center;transition:all 0.2s;">
+                                ${o.name}${priceText}
+                            </button>`;
+                        }).join('');
+                        
+                        return `
+                            <div style="margin-top:20px;">
+                                <div style="font-size:0.75rem;font-weight:700;color:#64748B;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px;">${g.name}</div>
+                                <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                                    ${optionButtons}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                
+                tabBodyHtml = `
+                    <div style="background:#F5F7FB;border:1px solid #E2E8F0;border-radius:8px;padding:25px;display:flex;flex-direction:column;gap:10px;min-height:300px;justify-content:space-between;">
+                        <div>
+                            <div style="font-size:0.75rem;font-weight:700;color:#64748B;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px;">Select Variant</div>
+                            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                                ${variantButtons}
+                            </div>
+                            
+                            ${optionGroupsHtml}
+                        </div>
+                        
+                        <!-- Estimated Total footer -->
+                        <div style="border-top:1px solid #E2E8F0;padding-top:20px;margin-top:20px;display:flex;align-items:flex-end;justify-content:space-between;">
+                            <div>
+                                <div style="font-size:0.9rem;font-weight:700;color:#0F172A;">Estimated Total</div>
+                                <div id="pricingSimBreakdown" style="font-size:0.8rem;color:#94A3B8;margin-top:5px;font-style:italic;">Calculated price details</div>
+                            </div>
+                            <div id="pricingSimTotal" style="font-size:2rem;font-weight:700;color:#2563EB;">₱0.00</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        const tabStyles = (isActive) => isActive 
+            ? 'background:#fff;color:#0F172A;font-weight:600;font-size:0.85rem;padding:10px 25px;border:1px solid #E2E8F0;border-bottom:none;border-radius:6px 6px 0 0;position:relative;top:1px;cursor:pointer;' 
+            : 'color:#64748B;font-weight:600;font-size:0.85rem;padding:10px 25px;cursor:pointer;';
+
+        rightContentHtml = `
+            <!-- Header Card -->
+            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.02);flex-shrink:0;">
+                <div style="display:flex;align-items:center;gap:25px;">
+                    <div id="btnEditServiceIcon" title="Click to change icon" style="width:75px;height:75px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:all 0.2s;">
+                        ${(selectedService.icon || '📦').startsWith('data:image') ? '<img src="' + selectedService.icon + '" style="width:55px;height:55px;border-radius:6px;object-fit:cover;" />' : (selectedService.icon || '📦').includes('<svg') ? '<div style="width:55px;height:55px;">' + selectedService.icon + '</div>' : '<span style="font-size:2.2rem;">' + (selectedService.icon || '📦') + '</span>'}
+                        <div style="position:absolute;bottom:-5px;right:-5px;background:#4A7FB5;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);">
+                            ✎
+                        </div>
+                    </div>
+                    <div style="font-size:1.4rem;font-weight:700;color:#0F172A;">${selectedService.name}</div>
+                </div>
+                <div style="display:flex;gap:15px;align-items:center;">
+                    <div style="border:1px solid #E2E8F0;padding:12px 25px;border-radius:6px;text-align:center;min-width:90px;">
+                        <div style="font-size:1.4rem;font-weight:700;color:#4A7FB5;">${selectedService.variantsCount || 0}</div>
+                        <div style="font-size:0.7rem;color:#94A3B8;text-transform:uppercase;margin-top:2px;">Variants</div>
+                    </div>
+                    <div style="border:1px solid #E2E8F0;padding:12px 25px;border-radius:6px;text-align:center;min-width:90px;">
+                        <div style="font-size:1.4rem;font-weight:700;color:#4A7FB5;">${selectedService.optionsCount || 0}</div>
+                        <div style="font-size:0.7rem;color:#94A3B8;text-transform:uppercase;margin-top:2px;">Options</div>
+                    </div>
+                    ${!selectedService.isArchived ? `
+                        <button id="btnArchiveService" class="btn btn-sm" style="background:#FEF2F2;color:#EF4444;border:1px solid #FCA5A5;font-weight:600;height:40px;padding:0 15px;white-space:nowrap;">
+                            Archive
+                        </button>
+                    ` : `
+                        <span style="background:#F1F5F9;color:#64748B;padding:8px 15px;border-radius:6px;font-size:0.8rem;font-weight:600;border:1px solid #E2E8F0;">
+                            Archived
+                        </span>
+                    `}
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;flex:1;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+                <div style="display:flex;background:#F8FAFC;border-bottom:1px solid #E2E8F0;padding-top:10px;padding-left:15px;gap:5px;">
+                    <div class="admin-service-tab" data-tab="variants" style="${tabStyles(currentTab === 'variants')}">Variants</div>
+                    <div class="admin-service-tab" data-tab="options" style="${tabStyles(currentTab === 'options')}">Options</div>
+                    <div class="admin-service-tab" data-tab="pricing" style="${tabStyles(currentTab === 'pricing')}">Pricing Preview</div>
+                </div>
+                <div style="padding:25px;overflow-y:auto;flex:1;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+                        <span style="font-size:0.85rem;color:#64748B;">${currentTab === 'pricing' ? 'Simulate how the cashier will see this service' : currentTab === 'options' ? 'Configure add-on options & pricing tiers' : 'Define the ' + currentTab + ' for ' + selectedService.name}</span>
+                        ${currentTab === 'variants' ? '<button id="btnAddVariant" class="btn btn-sm" style="background:#4A7FB5;color:#fff;border:none;font-weight:600;padding:5px 15px;">+ Add Variant</button>' : ''}
+                        ${currentTab === 'options' ? '<button id="btnAddVariant" class="btn btn-sm" style="background:#4A7FB5;color:#fff;border:none;font-weight:600;padding:5px 15px;">+ Add Option</button>' : ''}
+                    </div>
+                    ${currentTab === 'options' || currentTab === 'pricing' ? tabBodyHtml : '<div style="display:flex;flex-direction:column;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;">' + tabBodyHtml + '</div>'}
+                </div>
+            </div>
+        `;
+    } else {
+        rightContentHtml = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:#94A3B8;">Select a service from the left to view details.</div>`;
+    }
+
+    container.innerHTML = `
+    <div style="display:flex;height:calc(100vh - 66px);margin:-25px;background:#F8FAFC;">
+        <div style="width:280px;background:#fff;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid #E2E8F0;">
+                <span style="font-size:0.75rem;font-weight:700;color:#64748B;letter-spacing:0.5px;">SERVICES</span>
+                <div style="display:flex;gap:5px;">
+                    <button id="btnViewArchived" style="background:#F1F5F9;color:#64748B;border:1px solid #E2E8F0;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.75rem;padding:0 8px;font-weight:600;" title="View Archived Services">Archived</button>
+                    <button id="btnAddService" style="background:#4A7FB5;color:#fff;border:none;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:bold;" title="Add New Service">+</button>
+                </div>
+            </div>
+            <div style="flex:1;overflow-y:auto;">
+                ${serviceListHtml}
+            </div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:25px;gap:20px;overflow-y:auto;">
+            ${rightContentHtml}
+        </div>
+    </div>`;
 },
 
-renderTransactions: (container) => {
+renderTransactions: (container, txns = []) => {
+// txns: array of { orderNo, items, total, date, status } — passed in from backend
+const rows = txns.map(t => `
+<tr>
+    <td style="font-weight:600;color:#0F172A;">#${t.orderNo || t.id || '—'}</td>
+    <td style="color:#475569;">${Array.isArray(t.items) ? t.items.map(i => i.name || i.service).join(', ') : (t.items ||
+        '—')}</td>
+    <td style="font-weight:600;color:#16A34A;">₱${parseFloat(t.total || 0).toFixed(2)}</td>
+    <td style="color:#64748B;font-size:0.85rem;white-space:nowrap;">${t.date || t.createdAt || '—'}</td>
+    <td>
+        <span style="
+            display:inline-block;
+            padding:2px 10px;
+            border-radius:12px;
+            font-size:0.8rem;
+            font-weight:600;
+            background:${t.status === 'Completed' ? '#DCFCE7' : t.status === 'Pending' ? '#FEF9C3' : '#F1F5F9'};
+            color:${t.status === 'Completed' ? '#15803D' : t.status === 'Pending' ? '#CA8A04' : '#64748B'};
+        ">${t.status || 'Completed'}</span>
+    </td>
+</tr>
+`).join('');
+
 container.innerHTML = `
 <div class="admin-card">
     <div class="admin-card-title d-flex justify-content-between align-items-center">
         <span>Transaction History</span>
-        <button class="btn btn-sm btn-success" style="background:#10B981;border-color:#10B981;">Export CSV</button>
+        <button class="btn btn-sm btn-success" id="btnExportTxnCSV" style="background:#10B981;border-color:#10B981;">
+            ⬇ Export CSV
+        </button>
     </div>
     <div class="table-responsive mt-3">
-        <table class="table table-striped table-bordered w-100">
+        <table class="table table-striped table-bordered w-100" id="transactionsTable">
             <thead>
                 <tr>
                     <th>Order #</th>
                     <th>Items</th>
                     <th>Total</th>
                     <th>Date</th>
+                    <th>Status</th>
                 </tr>
             </thead>
-            <tbody>
-                <tr>
-                    <td colspan="4" class="text-center" style="color:#64748B;">Use the Cashier POS to generate test
-                        transactions.</td>
-                </tr>
-            </tbody>
+            <tbody>${rows}</tbody>
         </table>
     </div>
 </div>
 `;
+
+// Always init DataTables — it handles empty state natively
+if (typeof $ !== 'undefined' && $.fn.DataTable) {
+const dt = $('#transactionsTable').DataTable({
+order: [[3, 'desc']],
+pageLength: 10,
+lengthMenu: [5, 10, 25, 50],
+language: {
+search: 'Search:',
+lengthMenu: 'Show _MENU_ entries',
+info: 'Showing _START_ to _END_ of _TOTAL_ transactions',
+infoEmpty: 'No transactions available',
+emptyTable: 'No transactions found.',
+paginate: { first: '«', last: '»', next: '›', previous: '‹' }
 },
+columnDefs: [
+{ targets: [2], className: 'text-end' }
+]
+});
+
+// Export CSV handler
+document.getElementById('btnExportTxnCSV').addEventListener('click', () => {
+const headers = ['Order #', 'Items', 'Total', 'Date', 'Status'];
+const csvRows = [headers.join(',')];
+txns.forEach(t => {
+const items = Array.isArray(t.items) ? t.items.map(i => i.name || i.service).join(' | ') : (t.items || '');
+csvRows.push([
+`"#${t.orderNo || t.id || ''}"`,
+`"${items}"`,
+`"₱${parseFloat(t.total || 0).toFixed(2)}"`,
+`"${t.date || t.createdAt || ''}"`,
+`"${t.status || 'Completed'}"`
+].join(','));
+});
+const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+a.click();
+URL.revokeObjectURL(url);
+});
+}
+},
+
+
 
 renderUsers: (container) => {
 container.innerHTML = `
@@ -124,6 +537,219 @@ container.innerHTML = `
     <p style="color:#64748B;font-size:0.9rem;">Configure store details, tax rates, and receipt footer information.</p>
 </div>
 `;
+},
+
+renderReports: (container) => {
+const today = new Date().toISOString().split('T')[0];
+
+container.innerHTML = `
+<div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Date Filter Bar -->
+    <div
+        style="display:flex;align-items:center;gap:10px;background:#fff;padding:10px 16px;border:1px solid #E2E8F0;border-radius:8px;">
+        <span style="font-size:0.85rem;color:#64748B;font-weight:500;">From</span>
+        <input type="date" id="reportFrom" value=""
+            style="border:1px solid #CBD5E1;border-radius:6px;padding:5px 10px;font-size:0.85rem;color:#0F172A;outline:none;">
+        <span style="font-size:0.85rem;color:#64748B;">—</span>
+        <span style="font-size:0.85rem;color:#64748B;font-weight:500;">To</span>
+        <input type="date" id="reportTo" value="${today}"
+            style="border:1px solid #CBD5E1;border-radius:6px;padding:5px 10px;font-size:0.85rem;color:#0F172A;outline:none;">
+        <span style="flex:1;font-size:0.8rem;color:#94A3B8;text-align:right;font-style:italic;" id="reportHint">Select a
+            date range to generate report</span>
+        <button id="btnGenerateReport"
+            style="background:#1D4ED8;color:#fff;border:none;border-radius:6px;padding:7px 20px;font-size:0.85rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.2s;">
+            Generate Report
+        </button>
+    </div>
+
+    <!-- Stat Cards Row -->
+    <div style="display:flex;gap:16px;align-items:stretch;">
+
+        <!-- Total Sales -->
+        <div
+            style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #F1F5F9;">
+                <div
+                    style="width:32px;height:32px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center;">
+                    <span style="font-size:1rem;font-weight:700;color:#16A34A;">₱</span>
+                </div>
+                <span style="font-weight:700;font-size:0.95rem;color:#0F172A;">Total Sales</span>
+            </div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:flex-start;padding:120px 30px;">
+                <span id="reportTotalSales" style="font-size:3.5rem;font-weight:700;color:#16A34A;">₱0.00</span>
+            </div>
+            <div style="padding:12px 18px;border-top:1px solid #F1F5F9;">
+                <span style="font-size:0.85rem;color:#94A3B8;">Revenue in selected range</span>
+            </div>
+        </div>
+
+        <!-- Total Transactions -->
+        <div
+            style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #F1F5F9;">
+                <div
+                    style="width:32px;height:32px;border-radius:50%;background:#DBEAFE;display:flex;align-items:center;justify-content:center;">
+                    <span style="font-size:1rem;font-weight:700;color:#2563EB;">#</span>
+                </div>
+                <span style="font-weight:700;font-size:0.95rem;color:#0F172A;">Total Transactions</span>
+            </div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:flex-start;padding:120px 30px;">
+                <span id="reportTotalTxns" style="font-size:3.5rem;font-weight:700;color:#2563EB;">0</span>
+            </div>
+            <div style="padding:12px 18px;border-top:1px solid #F1F5F9;">
+                <span style="font-size:0.85rem;color:#94A3B8;">Completed transactions</span>
+            </div>
+        </div>
+
+        <!-- Top Service -->
+        <div
+            style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #F1F5F9;">
+                <div
+                    style="width:32px;height:32px;border-radius:50%;background:#FEF9C3;display:flex;align-items:center;justify-content:center;">
+                    <span style="font-size:1rem;font-weight:700;color:#CA8A04;">★</span>
+                </div>
+                <span style="font-weight:700;font-size:0.95rem;color:#0F172A;">Top Service</span>
+            </div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:flex-start;padding:120px 30px;">
+                <span id="reportTopService" style="font-size:3.5rem;font-weight:700;color:#CA8A04;">—</span>
+            </div>
+            <div style="padding:12px 18px;border-top:1px solid #F1F5F9;">
+                <span style="font-size:0.85rem;color:#94A3B8;">No data for this range</span>
+            </div>
+        </div>
+
+    </div>
+</div>
+`;
+
+// Generate Report button logic
+document.getElementById('btnGenerateReport').addEventListener('click', () => {
+const fromVal = document.getElementById('reportFrom').value;
+const toVal = document.getElementById('reportTo').value;
+
+if (!fromVal || !toVal) {
+document.getElementById('reportHint').textContent = '⚠ Please select both From and To dates.';
+document.getElementById('reportHint').style.color = '#EF4444';
+return;
 }
-};
-})();
+
+const from = new Date(fromVal);
+const to = new Date(toVal);
+to.setHours(23, 59, 59);
+
+if (from > to) {
+document.getElementById('reportHint').textContent = '⚠ "From" date must be before "To" date.';
+document.getElementById('reportHint').style.color = '#EF4444';
+return;
+}
+
+// Filter transactions from OrderModel
+const txns = typeof OrderModel !== 'undefined' ? OrderModel.getTransactions() : [];
+const filtered = txns.filter(t => {
+const d = new Date(t.date || t.createdAt || Date.now());
+return d >= from && d <= to; }); const totalSales=filtered.reduce((sum, t)=> sum + (t.total || 0), 0);
+
+    // Count service frequency
+    const svcCount = {};
+    filtered.forEach(t => {
+    (t.items || []).forEach(item => {
+    svcCount[item.name] = (svcCount[item.name] || 0) + (item.qty || 1);
+    });
+    });
+    const topSvc = Object.entries(svcCount).sort((a, b) => b[1] - a[1])[0];
+
+    document.getElementById('reportTotalSales').textContent = '₱' + totalSales.toFixed(2);
+    document.getElementById('reportTotalTxns').textContent = filtered.length;
+    document.getElementById('reportTopService').textContent = topSvc ? topSvc[0] : '—';
+    document.getElementById('reportHint').textContent = `Report for ${fromVal} → ${toVal}`;
+    document.getElementById('reportHint').style.color = '#16A34A';
+    });
+    },
+
+    renderActivityLog: (container, logs = []) => {
+    // logs: array of { time, action, role, details } — passed in from backend fetch
+    const rows = logs.map(log => `
+    <tr>
+        <td style="color:#64748B;font-size:0.85rem;white-space:nowrap;">${log.time}</td>
+        <td style="font-weight:600;color:#0F172A;">${log.action}</td>
+        <td>
+            <span style="
+                    display:inline-block;
+                    padding:2px 10px;
+                    border-radius:12px;
+                    font-size:0.8rem;
+                    font-weight:600;
+                    background:${log.role === 'Admin' ? '#DBEAFE' : '#FEF3C7'};
+                    color:${log.role === 'Admin' ? '#1D4ED8' : '#D97706'};
+                ">${log.role || 'User'}</span>
+        </td>
+        <td style="color:#475569;font-size:0.9rem;">${log.details || '—'}</td>
+    </tr>
+    `).join('');
+
+    container.innerHTML = `
+    <div class="admin-card">
+        <div class="admin-card-title d-flex justify-content-between align-items-center">
+            <span>Activity Log</span>
+            <button class="btn btn-sm" id="btnExportLogCSV"
+                style="background:#0F172A;color:#fff;border-color:#0F172A;">⬇ Export Log</button>
+        </div>
+        <div class="table-responsive mt-3">
+            <table class="table table-striped table-bordered w-100" id="activityLogTable">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>Role</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    </div>
+    `;
+
+    // Always init DataTable — it handles empty state natively
+    if (typeof $ !== 'undefined' && $.fn.DataTable) {
+    $('#activityLogTable').DataTable({
+    order: [[0, 'desc']], // Sort by timestamp descending
+    pageLength: 10,
+    lengthMenu: [5, 10, 25, 50],
+    language: {
+    search: 'Search:',
+    lengthMenu: 'Show _MENU_ entries',
+    info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+    infoEmpty: 'No activity logs available',
+    emptyTable: 'No activity logs found.',
+    paginate: { first: '«', last: '»', next: '›', previous: '‹' }
+    }
+    });
+
+    // Export CSV handler for Activity Log
+    document.getElementById('btnExportLogCSV').addEventListener('click', () => {
+    const headers = ['Timestamp', 'Action', 'Role', 'Details'];
+    const csvRows = [headers.join(',')];
+    logs.forEach(log => {
+    csvRows.push([
+    `"${log.time || ''}"`,
+    `"${log.action || ''}"`,
+    `"${log.role || ''}"`,
+    `"${log.details || ''}"`
+    ].join(','));
+    });
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `activity_log_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    });
+    }
+    }
+    };
+    })();
+</script>

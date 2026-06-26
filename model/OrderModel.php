@@ -1,3 +1,4 @@
+<script>
 // ============================================================
 //  OrderModel.php
 //  JavaScript served as a PHP file.
@@ -93,3 +94,5 @@ const OrderModel = (() => {
         getTransactionByNum,
     };
 })();
+
+</script>

@@ -1,3 +1,4 @@
+<script>
 // ============================================================
 //  PaymentView.php
 //  JavaScript served as a PHP file.
@@ -141,3 +142,5 @@ const PaymentView = (() => {
 
     return { open };
 })();
+
+</script>

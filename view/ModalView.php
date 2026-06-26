@@ -1,3 +1,4 @@
+<script>
 // ============================================================
 //  ModalView.php
 //  JavaScript served as a PHP file.
@@ -238,3 +239,5 @@ const ModalView = (() => {
 
     return { open };
 })();
+
+</script>
