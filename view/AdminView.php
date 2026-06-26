@@ -36,8 +36,8 @@ txns.forEach(t => {
 const td = new Date(t.date || t.createdAt || null);
 if (td.toDateString() !== todayStr) return;
 (t.items || []).forEach(item => {
-svcCount[item.name || item.service || 'Unknown'] = (svcCount[item.name || item.service || 'Unknown'] || 0) + (item.qty
-|| 1);
+    const sName = item.serviceName || item.name || item.service || 'Unknown';
+    svcCount[sName] = (svcCount[sName] || 0) + (item.qty || 1);
 });
 });
 const serviceLabels = Object.keys(svcCount).length ? Object.keys(svcCount) : ['No data'];
@@ -199,7 +199,7 @@ renderServices: (container, services = [], selectedServiceId = null, currentTab 
         ? activeServices.map(s => `
             <div class="service-list-item ${s.id == selectedServiceId ? 'active' : ''}" data-id="${s.id}" style="display:flex;align-items:center;padding:12px 20px;border-left:3px solid ${s.id == selectedServiceId ? '#0F172A' : 'transparent'};background:${s.id == selectedServiceId ? '#F1F5F9' : 'transparent'};border-bottom:1px solid #F1F5F9;cursor:pointer;">
                 <div style="width:36px;height:36px;background:#fff;border-radius:6px;border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:center;margin-right:12px;">
-                    ${(s.icon || '📦').startsWith('data:image') ? '<img src="' + s.icon + '" style="width:28px;height:28px;border-radius:4px;object-fit:cover;" />' : (s.icon || '📦').includes('<svg') ? '<div style="width:28px;height:28px;">' + s.icon + '</div>' : '<span style="font-size:1.2rem;">' + (s.icon || '📦') + '</span>'}
+                    ${((s.icon || '📦').startsWith('data:image') || (s.icon || '').startsWith('assets/')) ? '<img src="' + s.icon + '" style="width:28px;height:28px;border-radius:4px;object-fit:cover;" />' : (s.icon || '📦').includes('<svg') ? '<div style="width:28px;height:28px;">' + s.icon + '</div>' : '<span style="font-size:1.2rem;">' + (s.icon || '📦') + '</span>'}
                 </div>
                 <div style="flex:1;">
                     <div style="font-size:0.9rem;font-weight:600;color:#0F172A;">${s.name}</div>
@@ -355,7 +355,7 @@ renderServices: (container, services = [], selectedServiceId = null, currentTab 
             <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.02);flex-shrink:0;">
                 <div style="display:flex;align-items:center;gap:25px;">
                     <div id="btnEditServiceIcon" title="Click to change icon" style="width:75px;height:75px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:all 0.2s;">
-                        ${(selectedService.icon || '📦').startsWith('data:image') ? '<img src="' + selectedService.icon + '" style="width:55px;height:55px;border-radius:6px;object-fit:cover;" />' : (selectedService.icon || '📦').includes('<svg') ? '<div style="width:55px;height:55px;">' + selectedService.icon + '</div>' : '<span style="font-size:2.2rem;">' + (selectedService.icon || '📦') + '</span>'}
+                        ${((selectedService.icon || '📦').startsWith('data:image') || (selectedService.icon || '').startsWith('assets/')) ? '<img src="' + selectedService.icon + '" style="width:55px;height:55px;border-radius:6px;object-fit:cover;" />' : (selectedService.icon || '📦').includes('<svg') ? '<div style="width:55px;height:55px;">' + selectedService.icon + '</div>' : '<span style="font-size:2.2rem;">' + (selectedService.icon || '📦') + '</span>'}
                         <div style="position:absolute;bottom:-5px;right:-5px;background:#4A7FB5;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);">
                             ✎
                         </div>
@@ -425,44 +425,50 @@ renderServices: (container, services = [], selectedServiceId = null, currentTab 
 },
 
 renderTransactions: (container, txns = []) => {
-// txns: array of { orderNo, items, total, date, status } — passed in from backend
-const rows = txns.map(t => `
+// txns: array from backend
+const rows = txns.map(t => {
+    const servicesSummary = Array.isArray(t.items)
+        ? t.items.map(i => `${i.serviceName || i.name || '?'} (${i.variantLabel || ''}) x${i.qty || 1}`).join('<br>')
+        : (t.items || '—');
+    const statusColor = t.status === 'Pending' ? { bg: '#FEF9C3', text: '#CA8A04' } : { bg: '#DCFCE7', text: '#15803D' };
+    return `
 <tr>
-    <td style="font-weight:600;color:#0F172A;">#${t.orderNo || t.id || '—'}</td>
-    <td style="color:#475569;">${Array.isArray(t.items) ? t.items.map(i => i.name || i.service).join(', ') : (t.items ||
-        '—')}</td>
-    <td style="font-weight:600;color:#16A34A;">₱${parseFloat(t.total || 0).toFixed(2)}</td>
-    <td style="color:#64748B;font-size:0.85rem;white-space:nowrap;">${t.date || t.createdAt || '—'}</td>
+    <td style="font-weight:700;color:#0F172A;white-space:nowrap;">#${t.orderNum || t.id || '—'}</td>
+    <td style="color:#64748B;white-space:nowrap;">${t.date || '—'}</td>
+    <td style="color:#64748B;white-space:nowrap;">${t.time || '—'}</td>
+    <td style="color:#0F172A;">${t.customer || 'Walk-in'}</td>
+    <td style="color:#64748B;">${t.contact || '—'}</td>
+    <td style="color:#475569;font-size:0.82rem;">${servicesSummary}</td>
+    <td style="font-weight:600;color:#16A34A;white-space:nowrap;">₱${parseFloat(t.total || 0).toFixed(2)}</td>
+    <td style="color:#0F172A;white-space:nowrap;">₱${parseFloat(t.amountPaid || 0).toFixed(2)}</td>
+    <td style="color:#0F172A;white-space:nowrap;">₱${parseFloat(t.change || 0).toFixed(2)}</td>
+    <td style="color:#64748B;white-space:nowrap;">${t.paymentMethod || '—'}</td>
     <td>
-        <span style="
-            display:inline-block;
-            padding:2px 10px;
-            border-radius:12px;
-            font-size:0.8rem;
-            font-weight:600;
-            background:${t.status === 'Completed' ? '#DCFCE7' : t.status === 'Pending' ? '#FEF9C3' : '#F1F5F9'};
-            color:${t.status === 'Completed' ? '#15803D' : t.status === 'Pending' ? '#CA8A04' : '#64748B'};
-        ">${t.status || 'Completed'}</span>
+        <span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.8rem;font-weight:600;background:${statusColor.bg};color:${statusColor.text};">${t.status || 'Completed'}</span>
     </td>
-</tr>
-`).join('');
+</tr>`;
+}).join('');
 
 container.innerHTML = `
 <div class="admin-card">
     <div class="admin-card-title d-flex justify-content-between align-items-center">
         <span>Transaction History</span>
-        <button class="btn btn-sm btn-success" id="btnExportTxnCSV" style="background:#10B981;border-color:#10B981;">
-            ⬇ Export CSV
-        </button>
+        <button class="btn btn-sm btn-success" id="btnExportTxnCSV" style="background:#10B981;border-color:#10B981;">⬇ Export CSV</button>
     </div>
     <div class="table-responsive mt-3">
-        <table class="table table-striped table-bordered w-100" id="transactionsTable">
+        <table class="table table-striped table-bordered w-100" id="transactionsTable" style="font-size:0.85rem;">
             <thead>
                 <tr>
                     <th>Order #</th>
-                    <th>Items</th>
-                    <th>Total</th>
                     <th>Date</th>
+                    <th>Time</th>
+                    <th>Customer</th>
+                    <th>Contact No.</th>
+                    <th>Services Summary</th>
+                    <th>Total Amount</th>
+                    <th>Cash Received</th>
+                    <th>Change</th>
+                    <th>Payment Method</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -472,47 +478,51 @@ container.innerHTML = `
 </div>
 `;
 
-// Always init DataTables — it handles empty state natively
 if (typeof $ !== 'undefined' && $.fn.DataTable) {
-const dt = $('#transactionsTable').DataTable({
-order: [[3, 'desc']],
-pageLength: 10,
-lengthMenu: [5, 10, 25, 50],
-language: {
-search: 'Search:',
-lengthMenu: 'Show _MENU_ entries',
-info: 'Showing _START_ to _END_ of _TOTAL_ transactions',
-infoEmpty: 'No transactions available',
-emptyTable: 'No transactions found.',
-paginate: { first: '«', last: '»', next: '›', previous: '‹' }
-},
-columnDefs: [
-{ targets: [2], className: 'text-end' }
-]
-});
+    $('#transactionsTable').DataTable({
+        order: [[1, 'desc'], [2, 'desc']],
+        pageLength: 10,
+        lengthMenu: [5, 10, 25, 50],
+        scrollX: true,
+        language: {
+            search: 'Search:',
+            lengthMenu: 'Show _MENU_ entries',
+            info: 'Showing _START_ to _END_ of _TOTAL_ transactions',
+            infoEmpty: 'No transactions available',
+            emptyTable: 'No transactions found.',
+            paginate: { first: '«', last: '»', next: '›', previous: '‹' }
+        }
+    });
 
-// Export CSV handler
-document.getElementById('btnExportTxnCSV').addEventListener('click', () => {
-const headers = ['Order #', 'Items', 'Total', 'Date', 'Status'];
-const csvRows = [headers.join(',')];
-txns.forEach(t => {
-const items = Array.isArray(t.items) ? t.items.map(i => i.name || i.service).join(' | ') : (t.items || '');
-csvRows.push([
-`"#${t.orderNo || t.id || ''}"`,
-`"${items}"`,
-`"₱${parseFloat(t.total || 0).toFixed(2)}"`,
-`"${t.date || t.createdAt || ''}"`,
-`"${t.status || 'Completed'}"`
-].join(','));
-});
-const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-const url = URL.createObjectURL(blob);
-const a = document.createElement('a');
-a.href = url;
-a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
-a.click();
-URL.revokeObjectURL(url);
-});
+    document.getElementById('btnExportTxnCSV').addEventListener('click', () => {
+        const headers = ['Order #', 'Date', 'Time', 'Customer', 'Contact No.', 'Services Summary', 'Total Amount', 'Cash Received', 'Payment Method', 'Status'];
+        const csvRows = [headers.join(',')];
+        txns.forEach(t => {
+            const summary = Array.isArray(t.items)
+                ? t.items.map(i => `${i.serviceName || '?'} (${i.variantLabel || ''}) x${i.qty || 1}`).join(' | ')
+                : (t.items || '');
+            csvRows.push([
+                `"#${t.orderNum || t.id || ''}"`,
+                `"${t.date || ''}"`,
+                `"${t.time || ''}"`,
+                `"${t.customer || ''}"`,
+                `"${t.contact || ''}"`,
+                `"${summary}"`,
+                `"₱${parseFloat(t.total || 0).toFixed(2)}"`,
+                `"₱${parseFloat(t.amountPaid || 0).toFixed(2)}"`,
+                `"₱${parseFloat(t.change || 0).toFixed(2)}"`,
+                `"${t.paymentMethod || ''}"`,
+                `"${t.status || 'Completed'}"`
+            ].join(','));
+        });
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
 }
 },
 
@@ -654,9 +664,10 @@ return d >= from && d <= to; }); const totalSales=filtered.reduce((sum, t)=> sum
     // Count service frequency
     const svcCount = {};
     filtered.forEach(t => {
-    (t.items || []).forEach(item => {
-    svcCount[item.name] = (svcCount[item.name] || 0) + (item.qty || 1);
-    });
+        (t.items || []).forEach(item => {
+            const sName = item.serviceName || item.name || 'Unknown';
+            svcCount[sName] = (svcCount[sName] || 0) + (item.qty || 1);
+        });
     });
     const topSvc = Object.entries(svcCount).sort((a, b) => b[1] - a[1])[0];
 

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -17,6 +18,21 @@
 
 <body>
 
+    <!-- Tap to Start Overlay -->
+    <div id="tapToStartOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.98);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;cursor:pointer;">
+        <style>
+            @keyframes pulseOverlay {
+                0% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.7; transform: scale(1.05); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+        </style>
+        <img src="assets/logo/logo.png" alt="Logo" style="height:150px;margin-bottom:20px;border-radius:12px;" />
+        <h1 style="font-weight:700;font-size:3.5rem;margin:0;">PiliPrint</h1>
+        <p style="font-size:1.5rem;color:#94A3B8;margin-bottom:50px;">Professional Printing Services</p>
+        <div style="font-size:2rem;font-weight:600;color:#38BDF8;animation: pulseOverlay 2s infinite;">TAP ANYWHERE TO START</div>
+    </div>
+
     <!-- ===== NAVBAR ===== -->
     <nav class="pos-navbar">
         <!-- Left: logo + brand -->
@@ -34,7 +50,7 @@
         <div style="display:flex;align-items:center;gap:8px;">
             <div class="navbar-datetime" id="navDatetime"></div>
             <button class="btn btn-txn-history" id="btnTransactionHistory">Transaction History</button>
-            <button class="btn btn-logout" id="btnLogout">Logout</button>
+            <button class="btn btn-logout" id="btnAdminLogin" style="background:#1E293B;">Admin Login</button>
         </div>
     </nav>
 
@@ -244,14 +260,20 @@
                     </div>
                 </div>
                 <div class="modal-body" style="padding: 20px;">
-                    <table id="txnTable" class="table table-striped table-bordered" style="width:100%">
+                    <table id="txnTable" class="table table-striped table-bordered" style="width:100%;font-size:0.85rem;">
                         <thead>
                             <tr>
                                 <th>Order #</th>
-                                <th>Items Summary</th>
+                                <th>Date</th>
+                                <th>Time</th>
                                 <th>Customer</th>
-                                <th>Total (₱)</th>
-                                <th>Date & Time</th>
+                                <th>Contact No.</th>
+                                <th>Services Summary</th>
+                                <th>Total Amount</th>
+                                <th>Cash Received</th>
+                                <th>Change</th>
+                                <th>Payment Method</th>
+                                <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -273,7 +295,7 @@
     <script src="assets/bootstrap/js/bootstrap.bundle.min.js"></script>
     <!-- SweetAlert2 -->
     <script src="assets/sweetalert2/sweetalert2.all.min.js"></script>
-    <!-- MVC JS (PHP-included) -->
+   
     <?php include 'model/ServiceModel.php'; ?>
     <?php include 'model/OrderModel.php'; ?>
     <?php include 'view/ServiceView.php'; ?>

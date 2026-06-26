@@ -10,17 +10,22 @@
     //  Hooks up Models and Views
     // ============================================================
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         // Initialize Dashboard
-        init();
+        await init();
     });
 
-    function init() {
-        // 1. Render the services grid
+    async function init() {
+        // 1. Fetch services from database
+        await ServiceModel.loadServices(false);
+        // Also fetch initial transactions
+        await OrderModel.loadTransactions();
+
+        // 2. Render the services grid
         const services = ServiceModel.getAll();
         ServiceView.render(services, handleServiceClick);
 
-        // 2. Initial render of the order list (empty)
+        // 3. Initial render of the order list (empty)
         updateOrderDisplay();
 
         // 3. Setup event listeners
@@ -28,11 +33,32 @@
         document.getElementById('btnPlaceOrder').addEventListener('click', handlePlaceOrder);
         document.getElementById('btnPrintReceipt').addEventListener('click', handlePrintReceipt);
         document.getElementById('btnTransactionHistory').addEventListener('click', handleShowTransactionHistory);
-        document.getElementById('btnLogout').addEventListener('click', handleLogout);
+        document.getElementById('btnAdminLogin').addEventListener('click', () => { window.location.href = 'admin.php'; });
         document.getElementById('btnExportCSV').addEventListener('click', handleExportCSV);
+
+        // Tap to Start overlay logic
+        const overlay = document.getElementById('tapToStartOverlay');
+        if (overlay) {
+            overlay.addEventListener('click', () => {
+                overlay.style.display = 'none';
+            });
+        }
 
         // 4. Start Navbar Datetime ticker
         startDatetimeTicker();
+
+        // 5. Auto-sync services from database every 5 seconds (Ajax polling)
+        setInterval(async () => {
+            const oldServicesData = JSON.stringify(ServiceModel.getAll());
+            await ServiceModel.loadServices(false);
+            const newServicesData = JSON.stringify(ServiceModel.getAll());
+            
+            // Only re-render if the services data actually changed (to prevent UI flashing/interruptions)
+            if (oldServicesData !== newServicesData) {
+                const updatedServices = ServiceModel.getAll();
+                ServiceView.render(updatedServices, handleServiceClick);
+            }
+        }, 5000);
     }
 
     // Update order lists and details panel
@@ -129,15 +155,19 @@
         }
 
         const total = OrderModel.getTotal();
-        PaymentView.open(total, (paymentInfo) => {
+        PaymentView.open(total, async (paymentInfo) => {
             // Place the order in the model
-            const txn = OrderModel.placeOrder(paymentInfo);
+            const txn = await OrderModel.placeOrder(paymentInfo);
 
-            // Show receipt in a modal
-            showReceiptModal(txn);
+            if (txn) {
+                // Show receipt in a modal
+                showReceiptModal(txn);
 
-            // Reset order view and show receipt details in order preview
-            updateOrderDisplay(txn);
+                // Reset order view and show receipt details in order preview
+                updateOrderDisplay(txn);
+            } else {
+                Swal.fire('Error', 'Failed to save transaction to database.', 'error');
+            }
         });
     }
 
@@ -227,8 +257,10 @@
     }
 
     // Show transaction history modal
-    function handleShowTransactionHistory() {
+    async function handleShowTransactionHistory() {
         try {
+            // Fetch fresh transactions before showing modal
+            await OrderModel.loadTransactions();
             const txns = OrderModel.getTransactions();
             const tbody = document.getElementById('txnTableBody');
             if (!tbody) {
@@ -252,24 +284,34 @@
             txns.forEach((t) => {
                 const tr = document.createElement('tr');
 
-                // Build items list short summary
-                const itemsSummary = t.items.map(item => `${item.serviceName} (${item.qty}x)`).join(', ');
+                // Build services summary
+                const servicesSummary = Array.isArray(t.items)
+                    ? t.items.map(i => `${i.serviceName || '?'} (${i.variantLabel || ''}) x${i.qty || 1}`).join(', ')
+                    : '—';
+
+                const statusBg = t.status === 'Pending' ? '#FEF9C3' : '#DCFCE7';
+                const statusColor = t.status === 'Pending' ? '#CA8A04' : '#15803D';
 
                 tr.innerHTML = `
-                <td>#${t.orderNum}</td>
-                <td title="${itemsSummary}">${itemsSummary}</td>
+                <td style="font-weight:700;white-space:nowrap;">#${t.orderNum}</td>
+                <td style="white-space:nowrap;">${t.date || '—'}</td>
+                <td style="white-space:nowrap;">${t.time || '—'}</td>
                 <td>${t.customer || 'Walk-in'}</td>
-                <td>₱${t.total.toFixed(2)}</td>
-                <td>${t.date} ${t.time}</td>
+                <td>${t.contact || '—'}</td>
+                <td style="font-size:0.8rem;">${servicesSummary}</td>
+                <td style="font-weight:600;color:#16A34A;white-space:nowrap;">₱${parseFloat(t.total || 0).toFixed(2)}</td>
+                <td style="white-space:nowrap;">₱${parseFloat(t.amountPaid || 0).toFixed(2)}</td>
+                <td style="white-space:nowrap;">₱${parseFloat(t.change || 0).toFixed(2)}</td>
+                <td>${t.paymentMethod || '—'}</td>
+                <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.78rem;font-weight:600;background:${statusBg};color:${statusColor};">${t.status || 'Completed'}</span></td>
                 <td>
-                    <button class="btn btn-sm btn-primary btn-view-txn" data-num="${t.orderNum}" style="background-color:#0F172A;border-color:#0F172A;font-size:0.7rem;padding:4px 10px;">View</button>
+                    <button class="btn btn-sm btn-primary btn-view-txn" data-num="${t.orderNum}" style="background-color:#0F172A;border-color:#0F172A;font-size:0.7rem;padding:4px 10px;">View Receipt</button>
                 </td>
             `;
 
                 tr.querySelector('.btn-view-txn').addEventListener('click', () => {
                     const txn = OrderModel.getTransactionByNum(t.orderNum);
                     if (txn) {
-                        // Update preview and show modal
                         const shopInfo = ServiceModel.getShopInfo();
                         OrderView.renderReceiptPreview(txn.items, txn.total, shopInfo, txn);
                         showReceiptModal(txn);
@@ -279,11 +321,12 @@
                 tbody.appendChild(tr);
             });
 
-            // Initialize DataTable with search, sorting, and pagination
+            // Initialize DataTable
             $('#txnTable').DataTable({
-                "order": [[0, "desc"]], // Sort by Order # descending initially
-                "pageLength": 5, // Keep pagination small for the modal
-                "lengthMenu": [5, 10, 25, 50],
+                "order": [[0, "desc"]],
+                "pageLength": 5,
+                "lengthMenu": [5, 10, 25],
+                "scrollX": true,
                 "language": {
                     "emptyTable": "No transactions yet."
                 }
@@ -306,30 +349,7 @@
         }
     }
 
-    // Handle Logout
-    function handleLogout() {
-        Swal.fire({
-            title: 'Logout?',
-            text: 'Are you sure you want to logout of PrintMaster POS?',
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#2e4a6e',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Yes, logout'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Logged Out',
-                    text: 'Redirecting to login page...',
-                    showConfirmButton: false,
-                    timer: 1500
-                }).then(() => {
-                    window.location.href = 'view/auth/login.php';
-                });
-            }
-        });
-    }
+
 
     // Datetime ticker in navbar
     function startDatetimeTicker() {

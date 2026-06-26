@@ -29,11 +29,15 @@ const ModalView = (() => {
         _state.modal = modal;
     }
 
-    function _getItemTotal() {
+    function _getUnitPrice() {
         if (!_state.selectedVariant) return 0;
         let total = _state.selectedVariant.price;
         Object.values(_state.selectedOptions).forEach(o => { total += o.price || 0; });
         return total;
+    }
+
+    function _getItemTotal() {
+        return _getUnitPrice() * (_state.qty || 1);
     }
 
     function _updateItemTotal() {
@@ -227,7 +231,7 @@ const ModalView = (() => {
                     variantLabel: _state.selectedVariant.label,
                     options,
                     optionSummary,
-                    unitPrice: _getItemTotal(),
+                    unitPrice: _getUnitPrice(),
                     qty: _state.qty,
                 });
                 _state.modal.hide();

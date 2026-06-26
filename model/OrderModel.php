@@ -12,7 +12,7 @@
 const OrderModel = (() => {
 
     let currentOrder = [];
-    let orderCounter = 73; // starts at 73 so first order is #0074
+    let transactions = [];
 
     // ---- Current Order ----
 
@@ -50,35 +50,60 @@ const OrderModel = (() => {
 
     // ---- Transactions ----
 
-    function placeOrder(paymentInfo) {
-        orderCounter++;
-        const orderNum = String(orderCounter).padStart(4, '0');
-        const now = new Date();
-        const txn = {
-            orderNum,
+    async function placeOrder(paymentInfo) {
+        const payload = {
             items: [...currentOrder],
             total: getTotal(),
             customer: paymentInfo.customer,
             contact: paymentInfo.contact,
             paymentMethod: paymentInfo.paymentMethod,
             amountPaid: paymentInfo.amountPaid,
-            change: paymentInfo.amountPaid - getTotal(),
-            date: now.toISOString().slice(0, 10),
-            time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            change: paymentInfo.amountPaid - getTotal()
         };
         
-        clearOrder();
-        return txn;
+        try {
+            const res = await fetch('api/transactions.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                clearOrder();
+                // refresh local list
+                await loadTransactions();
+                return data.transaction;
+            } else {
+                console.error("Failed to place order:", data.message);
+                return null;
+            }
+        } catch (e) {
+            console.error(e);
+            return null;
+        }
+    }
+
+    async function loadTransactions() {
+        try {
+            const res = await fetch('api/transactions.php');
+            const data = await res.json();
+            if (data.success) {
+                transactions = data.transactions;
+            }
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     function getTransactions() {
-        // Will be retrieved from database later
-        return [];
+        return transactions;
     }
 
     function getTransactionByNum(num) {
-        // Will be retrieved from database later
-        return null;
+        return transactions.find(t => t.orderNum === num) || null;
     }
 
     return {
@@ -90,6 +115,7 @@ const OrderModel = (() => {
         isEmpty,
         updateQty,
         placeOrder,
+        loadTransactions,
         getTransactions,
         getTransactionByNum,
     };

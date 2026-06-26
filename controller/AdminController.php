@@ -8,9 +8,10 @@
 let adminServicesState = [];
 let currentAdminServiceId = null;
 let currentAdminTab = 'variants';
+let currentAdminNavTarget = 'dashboard';
 
-document.addEventListener('DOMContentLoaded', () => {
-    initAdmin();
+document.addEventListener('DOMContentLoaded', async () => {
+    await initAdmin();
 });
 
 // Helper: handle icon file selection (used in Add Service dialog)
@@ -19,8 +20,8 @@ function handleIconFile(file, previewDiv, previewImg, placeholderDiv, dropZone) 
         Swal.showValidationMessage('Please select an image file');
         return;
     }
-    if (file.size > 512000) {
-        Swal.showValidationMessage('Image must be under 500KB');
+    if (file.size > 5242880) { // 5MB limit
+        Swal.showValidationMessage('Image must be under 5MB');
         return;
     }
     const reader = new FileReader();
@@ -34,9 +35,11 @@ function handleIconFile(file, previewDiv, previewImg, placeholderDiv, dropZone) 
         dropZone.style.borderColor = '#16A34A';
     };
     reader.readAsDataURL(file);
+    return file; // Return the file object for uploading
 }
 
-function initAdminServicesState() {
+async function reloadAdminServicesState() {
+    await ServiceModel.loadServices(true);
     if (typeof ServiceModel !== 'undefined') {
         adminServicesState = ServiceModel.getAll().map(s => {
             let optionGroups = [];
@@ -44,9 +47,10 @@ function initAdminServicesState() {
                 optionGroups = s.optionGroups.map(g => ({
                     id: g.id,
                     name: g.label,
-                    type: g.id === 'thickness' ? 'Page Tier' : 'Choice',
+                    type: g.type,
                     options: g.options ? g.options.map(o => ({
-                        id: o.id,
+                        id: o.id.split('_')[1] || o.id, // clean ID
+                        fullId: o.id, // choice_1 or tier_1
                         name: o.label,
                         price: o.price
                     })) : []
@@ -56,14 +60,18 @@ function initAdminServicesState() {
                 id: s.id,
                 name: s.label,
                 icon: s.icon,
+                isArchived: s.isArchived,
                 variants: s.variants ? s.variants.map(v => ({ id: v.id, name: v.label, basePrice: v.price })) : [],
                 optionGroups: optionGroups,
                 get variantsCount() { return this.variants.length; },
                 get optionsCount() { return this.optionGroups.length; }
             };
         });
-        if (adminServicesState.length > 0) {
-            currentAdminServiceId = adminServicesState[0].id;
+        
+        // If current service was deleted/archived and we have nothing selected, select first active
+        if (!currentAdminServiceId && adminServicesState.length > 0) {
+            const firstActive = adminServicesState.find(s => !s.isArchived);
+            if (firstActive) currentAdminServiceId = firstActive.id;
         }
     }
 }
@@ -135,6 +143,28 @@ function updatePricingSimulationUI(container, service) {
     }
 }
 
+async function uploadImageFile(file) {
+    if (!file) return null;
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+        const res = await fetch('api/upload.php', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+            return data.path;
+        } else {
+            console.error(data.message);
+            return null;
+        }
+    } catch(e) {
+        console.error(e);
+        return null;
+    }
+}
+
 function refreshServicesUI() {
     const bodyEl = document.getElementById('adminContentBody');
     if (!bodyEl) return;
@@ -166,6 +196,7 @@ function refreshServicesUI() {
     const btnEditIcon = bodyEl.querySelector('#btnEditServiceIcon');
     if (btnEditIcon && currentService) {
         btnEditIcon.addEventListener('click', () => {
+            let selectedFile = null;
             Swal.fire({
                 title: 'Change Service Icon',
                 html: `
@@ -177,7 +208,7 @@ function refreshServicesUI() {
                             <div id="swalIconPlaceholder">
                                 <div style="font-size:1.5rem;margin-bottom:5px;">📁</div>
                                 <div style="font-size:0.85rem;color:#64748B;">Click to browse or drag & drop an image</div>
-                                <div style="font-size:0.75rem;color:#94A3B8;margin-top:3px;">PNG, JPG, SVG (max 500KB)</div>
+                                <div style="font-size:0.75rem;color:#94A3B8;margin-top:3px;">PNG, JPG (max 5MB)</div>
                             </div>
                             <input type="file" id="swalServiceIconFile" accept="image/*" style="display:none;" />
                         </div>
@@ -194,54 +225,37 @@ function refreshServicesUI() {
                     const previewImg = document.getElementById('swalIconPreviewImg');
                     const placeholder = document.getElementById('swalIconPlaceholder');
                     
-                    // Click to browse
                     dropZone.addEventListener('click', () => fileInput.click());
-                    
-                    // File selected
                     fileInput.addEventListener('change', (e) => {
                         if (e.target.files && e.target.files[0]) {
-                            handleIconFile(e.target.files[0], preview, previewImg, placeholder, dropZone);
-                        }
-                    });
-                    
-                    // Drag & drop
-                    dropZone.addEventListener('dragover', (e) => {
-                        e.preventDefault();
-                        dropZone.style.borderColor = '#4A7FB5';
-                        dropZone.style.background = '#EFF6FF';
-                    });
-                    dropZone.addEventListener('dragleave', () => {
-                        dropZone.style.borderColor = '#CBD5E1';
-                        dropZone.style.background = '#F8FAFC';
-                    });
-                    dropZone.addEventListener('drop', (e) => {
-                        e.preventDefault();
-                        dropZone.style.borderColor = '#CBD5E1';
-                        dropZone.style.background = '#F8FAFC';
-                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                            handleIconFile(e.dataTransfer.files[0], preview, previewImg, placeholder, dropZone);
+                            selectedFile = handleIconFile(e.target.files[0], preview, previewImg, placeholder, dropZone);
                         }
                     });
                 },
-                preConfirm: () => {
-                    const previewImg = document.getElementById('swalIconPreviewImg');
-                    if (previewImg.src && previewImg.src !== '' && !previewImg.src.endsWith('admin.php')) {
-                        return previewImg.src;
+                preConfirm: async () => {
+                    if (!selectedFile) {
+                        Swal.showValidationMessage('Please select an image first');
+                        return false;
                     }
-                    Swal.showValidationMessage('Please select an image first');
-                    return false;
+                    Swal.showLoading();
+                    const path = await uploadImageFile(selectedFile);
+                    if (!path) {
+                        Swal.showValidationMessage('Upload failed.');
+                        return false;
+                    }
+                    
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'update_icon');
+                    fd.append('id', currentService.id);
+                    fd.append('image_path', path);
+                    const res = await fetch('api/services.php', { method: 'POST', body: fd });
+                    return await res.json();
                 }
-            }).then((result) => {
+            }).then(async (result) => {
                 if (result.isConfirmed) {
-                    currentService.icon = result.value;
+                    await reloadAdminServicesState();
                     refreshServicesUI();
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Updated!',
-                        text: 'Service icon updated successfully.',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                    Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false });
                 }
             });
         });
@@ -253,17 +267,21 @@ function refreshServicesUI() {
         btnArchiveService.addEventListener('click', () => {
             Swal.fire({
                 title: 'Archive Service?',
-                text: `Are you sure you want to archive "${currentService.name}"? It will be hidden from the active list.`,
+                text: `Are you sure you want to archive "${currentService.name}"?`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#EF4444',
-                cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Yes, Archive It'
-            }).then((result) => {
+            }).then(async (result) => {
                 if (result.isConfirmed) {
-                    currentService.isArchived = true;
-                    // Reset selection to the first available active service
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'archive');
+                    fd.append('id', currentService.id);
+                    fd.append('status', 'Archived');
+                    await fetch('api/services.php', { method: 'POST', body: fd });
+                    
                     currentAdminServiceId = null; 
+                    await reloadAdminServicesState();
                     refreshServicesUI();
                     Swal.fire('Archived!', `${currentService.name} has been archived.`, 'success');
                 }
@@ -301,16 +319,19 @@ function refreshServicesUI() {
                 didOpen: () => {
                     const restoreBtns = document.querySelectorAll('.btn-restore-service');
                     restoreBtns.forEach(btn => {
-                        btn.addEventListener('click', (e) => {
+                        btn.addEventListener('click', async (e) => {
                             const sid = e.currentTarget.getAttribute('data-id');
-                            const srv = adminServicesState.find(s => s.id == sid);
-                            if (srv) {
-                                srv.isArchived = false;
-                                currentAdminServiceId = srv.id; // Switch to the restored service
-                                Swal.close();
-                                refreshServicesUI();
-                                Swal.fire('Restored!', `${srv.name} has been restored.`, 'success');
-                            }
+                            const fd = new URLSearchParams();
+                            fd.append('action', 'archive');
+                            fd.append('id', sid);
+                            fd.append('status', 'Active');
+                            await fetch('api/services.php', { method: 'POST', body: fd });
+                            
+                            currentAdminServiceId = sid;
+                            Swal.close();
+                            await reloadAdminServicesState();
+                            refreshServicesUI();
+                            Swal.fire('Restored!', `Service has been restored.`, 'success');
                         });
                     });
                 }
@@ -322,6 +343,7 @@ function refreshServicesUI() {
     const btnAddService = bodyEl.querySelector('#btnAddService');
     if (btnAddService) {
         btnAddService.addEventListener('click', () => {
+            let selectedFile = null;
             Swal.fire({
                 title: 'Add New Service',
                 html: `
@@ -337,7 +359,7 @@ function refreshServicesUI() {
                             <div id="swalIconPlaceholder">
                                 <div style="font-size:1.5rem;margin-bottom:5px;">📁</div>
                                 <div style="font-size:0.85rem;color:#64748B;">Click to browse or drag & drop an image</div>
-                                <div style="font-size:0.75rem;color:#94A3B8;margin-top:3px;">PNG, JPG, SVG (max 500KB)</div>
+                                <div style="font-size:0.75rem;color:#94A3B8;margin-top:3px;">PNG, JPG (max 5MB)</div>
                             </div>
                             <input type="file" id="swalServiceIconFile" accept="image/*" style="display:none;" />
                         </div>
@@ -354,69 +376,41 @@ function refreshServicesUI() {
                     const previewImg = document.getElementById('swalIconPreviewImg');
                     const placeholder = document.getElementById('swalIconPlaceholder');
                     
-                    // Click to browse
                     dropZone.addEventListener('click', () => fileInput.click());
-                    
-                    // File selected
                     fileInput.addEventListener('change', (e) => {
                         if (e.target.files && e.target.files[0]) {
-                            handleIconFile(e.target.files[0], preview, previewImg, placeholder, dropZone);
-                        }
-                    });
-                    
-                    // Drag & drop
-                    dropZone.addEventListener('dragover', (e) => {
-                        e.preventDefault();
-                        dropZone.style.borderColor = '#4A7FB5';
-                        dropZone.style.background = '#EFF6FF';
-                    });
-                    dropZone.addEventListener('dragleave', () => {
-                        dropZone.style.borderColor = '#CBD5E1';
-                        dropZone.style.background = '#F8FAFC';
-                    });
-                    dropZone.addEventListener('drop', (e) => {
-                        e.preventDefault();
-                        dropZone.style.borderColor = '#CBD5E1';
-                        dropZone.style.background = '#F8FAFC';
-                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                            handleIconFile(e.dataTransfer.files[0], preview, previewImg, placeholder, dropZone);
+                            selectedFile = handleIconFile(e.target.files[0], preview, previewImg, placeholder, dropZone);
                         }
                     });
                 },
-                preConfirm: () => {
+                preConfirm: async () => {
                     const name = document.getElementById('swalServiceName').value.trim();
                     if (!name) {
                         Swal.showValidationMessage('Please enter a service name');
                         return false;
                     }
-                    const previewImg = document.getElementById('swalIconPreviewImg');
-                    const icon = previewImg.src && previewImg.src !== '' && !previewImg.src.endsWith('admin.php') ? previewImg.src : '📦';
-                    return { name, icon };
+                    
+                    Swal.showLoading();
+                    let imagePath = '';
+                    if (selectedFile) {
+                        imagePath = await uploadImageFile(selectedFile) || '';
+                    }
+                    
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'create');
+                    fd.append('name', name);
+                    fd.append('image_path', imagePath);
+                    const res = await fetch('api/services.php', { method: 'POST', body: fd });
+                    return await res.json();
                 }
-            }).then((result) => {
+            }).then(async (result) => {
                 if (result.isConfirmed) {
-                    const newId = 'service_' + Date.now();
-                    const newService = {
-                        id: newId,
-                        name: result.value.name,
-                        icon: result.value.icon,
-                        variants: [],
-                        optionGroups: [],
-                        get variantsCount() { return this.variants.length; },
-                        get optionsCount() { return this.optionGroups.length; }
-                    };
-                    adminServicesState.push(newService);
-                    currentAdminServiceId = newId;
+                    currentAdminServiceId = result.value.id;
                     currentAdminTab = 'variants';
+                    await reloadAdminServicesState();
                     refreshServicesUI();
                     
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Created!',
-                        text: `Service "${result.value.name}" added successfully.`,
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                    Swal.fire({ icon: 'success', title: 'Created!', timer: 1500, showConfirmButton: false });
                 }
             });
         });
@@ -446,27 +440,24 @@ function refreshServicesUI() {
                     showCancelButton: true,
                     confirmButtonColor: '#4A7FB5',
                     confirmButtonText: 'Add Variant',
-                    preConfirm: () => {
+                    preConfirm: async () => {
                         const name = document.getElementById('swalVariantName').value.trim();
-                        const priceVal = document.getElementById('swalVariantPrice').value.trim();
-                        if (!name) {
-                            Swal.showValidationMessage('Please enter a variant name');
+                        const price = parseFloat(document.getElementById('swalVariantPrice').value.trim());
+                        if (!name || isNaN(price) || price < 0) {
+                            Swal.showValidationMessage('Please enter valid name and price');
                             return false;
                         }
-                        const price = parseFloat(priceVal);
-                        if (isNaN(price) || price < 0) {
-                            Swal.showValidationMessage('Please enter a valid price');
-                            return false;
-                        }
-                        return { name, price };
+                        const fd = new URLSearchParams();
+                        fd.append('action', 'add');
+                        fd.append('service_id', currentService.id);
+                        fd.append('name', name);
+                        fd.append('price', price);
+                        const res = await fetch('api/variants.php', { method: 'POST', body: fd });
+                        return await res.json();
                     }
-                }).then((result) => {
+                }).then(async (result) => {
                     if (result.isConfirmed) {
-                        currentService.variants.push({
-                            id: 'var_' + Date.now(),
-                            name: result.value.name,
-                            basePrice: result.value.price
-                        });
+                        await reloadAdminServicesState();
                         refreshServicesUI();
                         Swal.fire({ icon: 'success', title: 'Added!', timer: 1000, showConfirmButton: false });
                     }
@@ -491,25 +482,26 @@ function refreshServicesUI() {
                     showCancelButton: true,
                     confirmButtonColor: '#4A7FB5',
                     confirmButtonText: 'Add Group',
-                    preConfirm: () => {
+                    preConfirm: async () => {
                         const label = document.getElementById('swalGroupLabel').value.trim();
                         const type = document.getElementById('swalGroupType').value;
                         if (!label) {
                             Swal.showValidationMessage('Please enter a group label');
                             return false;
                         }
-                        return { label, type };
+                        const fd = new URLSearchParams();
+                        fd.append('action', 'add_group');
+                        fd.append('service_id', currentService.id);
+                        fd.append('label', label);
+                        fd.append('type', type);
+                        const res = await fetch('api/options.php', { method: 'POST', body: fd });
+                        return await res.json();
                     }
-                }).then((result) => {
+                }).then(async (result) => {
                     if (result.isConfirmed) {
-                        currentService.optionGroups.push({
-                            id: 'g_' + Date.now(),
-                            name: result.value.label,
-                            type: result.value.type,
-                            options: []
-                        });
+                        await reloadAdminServicesState();
                         refreshServicesUI();
-                        Swal.fire({ icon: 'success', title: 'Added Group!', timer: 1000, showConfirmButton: false });
+                        Swal.fire({ icon: 'success', title: 'Added!', timer: 1000, showConfirmButton: false });
                     }
                 });
             }
@@ -521,7 +513,6 @@ function refreshServicesUI() {
     btnRemoveVariants.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const itemId = e.currentTarget.getAttribute('data-id');
-            if (!currentService) return;
             Swal.fire({
                 title: 'Remove Variant?',
                 text: 'Are you sure you want to delete this variant?',
@@ -529,9 +520,13 @@ function refreshServicesUI() {
                 showCancelButton: true,
                 confirmButtonColor: '#EF4444',
                 confirmButtonText: 'Yes, remove'
-            }).then(result => {
+            }).then(async (result) => {
                 if (result.isConfirmed) {
-                    currentService.variants = currentService.variants.filter(v => v.id != itemId);
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'remove');
+                    fd.append('id', itemId);
+                    await fetch('api/variants.php', { method: 'POST', body: fd });
+                    await reloadAdminServicesState();
                     refreshServicesUI();
                 }
             });
@@ -543,7 +538,6 @@ function refreshServicesUI() {
     btnRemoveGroups.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const groupId = e.currentTarget.getAttribute('data-id');
-            if (!currentService) return;
             Swal.fire({
                 title: 'Remove Option Group?',
                 text: 'This will delete the option group and all its items.',
@@ -551,9 +545,13 @@ function refreshServicesUI() {
                 showCancelButton: true,
                 confirmButtonColor: '#EF4444',
                 confirmButtonText: 'Yes, delete group'
-            }).then(result => {
+            }).then(async result => {
                 if (result.isConfirmed) {
-                    currentService.optionGroups = currentService.optionGroups.filter(g => g.id != groupId);
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'remove_group');
+                    fd.append('id', groupId);
+                    await fetch('api/options.php', { method: 'POST', body: fd });
+                    await reloadAdminServicesState();
                     refreshServicesUI();
                 }
             });
@@ -584,27 +582,25 @@ function refreshServicesUI() {
                 showCancelButton: true,
                 confirmButtonColor: '#4A7FB5',
                 confirmButtonText: 'Add Item',
-                preConfirm: () => {
+                preConfirm: async () => {
                     const name = document.getElementById('swalOptName').value.trim();
-                    const priceVal = document.getElementById('swalOptPrice').value.trim();
-                    if (!name) {
-                        Swal.showValidationMessage('Please enter a name');
+                    const price = parseFloat(document.getElementById('swalOptPrice').value.trim());
+                    if (!name || isNaN(price) || price < 0) {
+                        Swal.showValidationMessage('Please enter valid name and price');
                         return false;
                     }
-                    const price = parseFloat(priceVal);
-                    if (isNaN(price) || price < 0) {
-                        Swal.showValidationMessage('Please enter a valid price');
-                        return false;
-                    }
-                    return { name, price };
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'add_item');
+                    fd.append('option_id', groupId);
+                    fd.append('type', group.type);
+                    fd.append('label', name);
+                    fd.append('price', price);
+                    const res = await fetch('api/options.php', { method: 'POST', body: fd });
+                    return await res.json();
                 }
-            }).then(result => {
+            }).then(async result => {
                 if (result.isConfirmed) {
-                    group.options.push({
-                        id: 'opt_' + Date.now(),
-                        name: result.value.name,
-                        price: result.value.price
-                    });
+                    await reloadAdminServicesState();
                     refreshServicesUI();
                 }
             });
@@ -640,27 +636,33 @@ function refreshServicesUI() {
                 denyButtonColor: '#EF4444',
                 confirmButtonText: 'Save',
                 denyButtonText: 'Delete',
-                preConfirm: () => {
+                preConfirm: async () => {
                     const name = document.getElementById('swalEditOptName').value.trim();
-                    const priceVal = document.getElementById('swalEditOptPrice').value.trim();
-                    if (!name) {
-                        Swal.showValidationMessage('Please enter a name');
+                    const price = parseFloat(document.getElementById('swalEditOptPrice').value.trim());
+                    if (!name || isNaN(price) || price < 0) {
+                        Swal.showValidationMessage('Please enter valid name and price');
                         return false;
                     }
-                    const price = parseFloat(priceVal);
-                    if (isNaN(price) || price < 0) {
-                        Swal.showValidationMessage('Please enter a valid price');
-                        return false;
-                    }
-                    return { name, price };
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'edit_item');
+                    fd.append('id', option.id);
+                    fd.append('type', group.type);
+                    fd.append('label', name);
+                    fd.append('price', price);
+                    const res = await fetch('api/options.php', { method: 'POST', body: fd });
+                    return await res.json();
                 }
-            }).then(result => {
+            }).then(async result => {
                 if (result.isConfirmed) {
-                    option.name = result.value.name;
-                    option.price = result.value.price;
+                    await reloadAdminServicesState();
                     refreshServicesUI();
                 } else if (result.isDenied) {
-                    group.options = group.options.filter(o => o.id != optionId);
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'remove_item');
+                    fd.append('id', option.id);
+                    fd.append('type', group.type);
+                    await fetch('api/options.php', { method: 'POST', body: fd });
+                    await reloadAdminServicesState();
                     refreshServicesUI();
                 }
             });
@@ -693,13 +695,14 @@ function refreshServicesUI() {
     }
 }
 
-function initAdmin() {
-    initAdminServicesState();
+async function initAdmin() {
+    await reloadAdminServicesState();
+    await OrderModel.loadTransactions();
 
     // Nav Click Handlers
     const navItems = document.querySelectorAll('.admin-nav-item');
     navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
+        item.addEventListener('click', async (e) => {
             // Remove active class from all
             navItems.forEach(n => n.classList.remove('active'));
             // Add active class to clicked
@@ -707,7 +710,8 @@ function initAdmin() {
             currentItem.classList.add('active');
             
             const target = currentItem.getAttribute('data-target');
-            loadAdminTab(target);
+            localStorage.setItem('adminActiveTab', target);
+            await loadAdminTab(target);
         });
     });
 
@@ -729,21 +733,70 @@ function initAdmin() {
                     text: 'Redirecting to login page...',
                     showConfirmButton: false,
                     timer: 1500
-                }).then(() => {
+                }).then(async () => {
+                    const fd = new URLSearchParams();
+                    fd.append('action', 'logout');
+                    await fetch('api/auth.php', { method: 'POST', body: fd });
                     window.location.href = 'view/auth/login.php';
                 });
             }
         });
     });
 
-    // Load initial tab (dashboard)
-    loadAdminTab('dashboard');
+    // Load initial tab (from localStorage or default to dashboard)
+    const savedTab = localStorage.getItem('adminActiveTab') || 'dashboard';
+    
+    // Visually set the active class on the nav item
+    navItems.forEach(n => {
+        n.classList.remove('active');
+        if (n.getAttribute('data-target') === savedTab) {
+            n.classList.add('active');
+        }
+    });
+    
+    await loadAdminTab(savedTab);
 
     // Start Navbar Datetime ticker
     startAdminDatetimeTicker();
+
+    // Auto-poll for transactions & services every 5 seconds
+    setInterval(async () => {
+        // Poll Services
+        const oldServicesData = JSON.stringify(adminServicesState);
+        await reloadAdminServicesState();
+        const newServicesData = JSON.stringify(adminServicesState);
+        
+        // Poll Transactions
+        const oldTxnsData = JSON.stringify(OrderModel.getTransactions());
+        await OrderModel.loadTransactions();
+        const newTxnsData = JSON.stringify(OrderModel.getTransactions());
+
+        // Re-render if there are changes and we are on the relevant tab
+        if (oldServicesData !== newServicesData && currentAdminNavTarget === 'services') {
+            refreshServicesUI();
+        }
+        if (oldTxnsData !== newTxnsData) {
+            if (currentAdminNavTarget === 'dashboard') {
+                const headerEl = document.getElementById('adminContentHeader');
+                const bodyEl = document.getElementById('adminContentBody');
+                if (bodyEl) AdminView.renderDashboard(bodyEl);
+            } else if (currentAdminNavTarget === 'transactions') {
+                const headerEl = document.getElementById('adminContentHeader');
+                const bodyEl = document.getElementById('adminContentBody');
+                if (bodyEl) {
+                    // Destroy old datatable before re-rendering
+                    if ($.fn.DataTable.isDataTable('#transactionsTable')) {
+                        $('#transactionsTable').DataTable().destroy();
+                    }
+                    AdminView.renderTransactions(bodyEl, OrderModel.getTransactions());
+                }
+            }
+        }
+    }, 5000);
 }
 
-function loadAdminTab(target) {
+async function loadAdminTab(target) {
+    currentAdminNavTarget = target;
     const headerEl = document.getElementById('adminContentHeader');
     const bodyEl = document.getElementById('adminContentBody');
 
@@ -752,11 +805,14 @@ function loadAdminTab(target) {
 
     // Call view rendering based on target
     if (target === 'dashboard') {
+        await OrderModel.loadTransactions();
         AdminView.renderDashboard(bodyEl);
     } else if (target === 'services') {
         refreshServicesUI();
     } else if (target === 'transactions') {
-        AdminView.renderTransactions(bodyEl);
+        await OrderModel.loadTransactions();
+        const txns = OrderModel.getTransactions();
+        AdminView.renderTransactions(bodyEl, txns);
     } else if (target === 'users') {
         AdminView.renderUsers(bodyEl);
     } else if (target === 'settings') {
