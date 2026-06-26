@@ -1,4 +1,9 @@
 // ============================================================
+//  ModalView.php
+//  JavaScript served as a PHP file.
+//  When using a PHP server, add header('Content-Type: application/javascript') above.
+// ============================================================
+// ============================================================
 //  VIEW: ModalView.js
 //  Renders the 3-step "Add Item to Order" modal
 // ============================================================

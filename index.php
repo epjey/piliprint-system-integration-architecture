@@ -273,6 +273,7 @@
     <script src="assets/bootstrap/js/bootstrap.bundle.min.js"></script>
     <!-- SweetAlert2 -->
     <script src="assets/sweetalert2/sweetalert2.all.min.js"></script>
+<<<<<<< HEAD
     <!-- MVC JS -->
     <script src="model/Ordermodel.js"></script>
     <script src="model/Servicemodel.js"></script>
@@ -281,6 +282,16 @@
     <script src="view/Modalview.js"></script>
     <script src="view/Paymentview.js"></script>
     <script src="controller/AppController.js"></script>
+=======
+    <!-- MVC JS (PHP-served) -->
+    <script src="model/ServiceModel.php"></script>
+    <script src="model/OrderModel.php"></script>
+    <script src="view/ServiceView.php"></script>
+    <script src="view/OrderView.php"></script>
+    <script src="view/ModalView.php"></script>
+    <script src="view/PaymentView.php"></script>
+    <script src="controller/AppController.php"></script>
+>>>>>>> 3898005b24bfba47551b987153f4d8507418e35d
 </body>
 
 </html>

@@ -1,4 +1,9 @@
 // ============================================================
+//  PaymentView.php
+//  JavaScript served as a PHP file.
+//  When using a PHP server, add header('Content-Type: application/javascript') above.
+// ============================================================
+// ============================================================
 //  VIEW: PaymentView.js
 //  Payment Calculator modal – numpad, change calc, confirm
 // ============================================================

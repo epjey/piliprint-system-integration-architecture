@@ -1,4 +1,10 @@
 // ============================================================
+//  AppController.php
+//  JavaScript served as a PHP file.
+//  When using a PHP server, add header('Content-Type: application/javascript') above.
+//  This is the main entry point — hooks up Models and Views.
+// ============================================================
+// ============================================================
 //  CONTROLLER: AppController.js
 //  Hooks up Models and Views
 // ============================================================

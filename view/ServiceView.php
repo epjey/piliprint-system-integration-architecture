@@ -1,4 +1,9 @@
 // ============================================================
+//  ServiceView.php
+//  JavaScript served as a PHP file.
+//  When using a PHP server, add header('Content-Type: application/javascript') above.
+// ============================================================
+// ============================================================
 //  VIEW: ServiceView.js
 //  Renders the Printing Services card grid
 // ============================================================
