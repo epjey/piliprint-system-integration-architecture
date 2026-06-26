@@ -690,16 +690,16 @@ body {
 }
 
 .variant-card:hover {
-    border-color: #0F172A;
-    /* Theme Navy on hover */
-    color: #0F172A;
+    border-color: #06B6D4;
+    /* Theme Cyan on hover */
+    color: #06B6D4;
 }
 
 .variant-card.selected {
-    background: #0F172A;
-    /* Theme Navy when selected */
+    background: #06B6D4;
+    /* Theme Cyan when selected */
     color: #fff;
-    border-color: #0F172A;
+    border-color: #06B6D4;
 }
 
 /* Option cards (Grid for uniform card sizes) */
