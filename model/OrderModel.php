@@ -1,4 +1,9 @@
 // ============================================================
+//  OrderModel.php
+//  JavaScript served as a PHP file.
+//  When using a PHP server, add header('Content-Type: application/javascript') above.
+// ============================================================
+// ============================================================
 //  MODEL: OrderModel.js
 //  Manages the current order and transaction history
 // ============================================================

@@ -1,4 +1,9 @@
 // ============================================================
+//  ServiceModel.php
+//  JavaScript served as a PHP file.
+//  When using a PHP server, add header('Content-Type: application/javascript') above.
+// ============================================================
+// ============================================================
 //  MODEL: ServiceModel.js
 //  Holds all printing service definitions, variants, options
 // ============================================================

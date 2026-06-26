@@ -669,34 +669,35 @@ body {
 }
 
 .variant-card {
-    background: #0F172A;
-    /* Dark Navy */
-    color: #fff;
+    background: #fff;
+    /* Default: white */
+    color: #0F172A;
     border-radius: 4px;
     padding: 0 14px;
     font-size: 0.82rem;
     font-weight: 500;
     cursor: pointer;
-    border: 2px solid transparent;
+    border: 1.5px solid #dcd3c4;
     width: 100%;
     height: 110px;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    transition: border 0.13s, background 0.13s;
+    transition: border 0.13s, background 0.13s, color 0.13s;
 }
 
 .variant-card:hover {
-    border-color: #1E293B;
-    /* Medium Navy */
+    border-color: #0F172A;
+    /* Theme Navy on hover */
+    color: #0F172A;
 }
 
 .variant-card.selected {
-    border-color: #E2E8F0;
-    /* Sandstone Selected border */
-    background: #020617;
-    /* Darker Navy */
+    background: #0F172A;
+    /* Theme Navy when selected */
+    color: #fff;
+    border-color: #0F172A;
 }
 
 /* Option cards (Grid for uniform card sizes) */
