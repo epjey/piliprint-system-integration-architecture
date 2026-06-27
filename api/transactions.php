@@ -67,23 +67,11 @@ if ($method === 'POST') {
         exit;
     }
     
-    $userId = $_SESSION['user_id'] ?? null; 
+    $userId = $_SESSION['cashier_user_id'] ?? $_SESSION['admin_user_id'] ?? null;
     
-    // Fallback if not logged in (e.g. Kiosk mode)
     if (!$userId) {
-        $userRes = $conn->query("SELECT user_id, role FROM users LIMIT 1");
-        if ($userRes && $userRes->num_rows > 0) {
-            $row = $userRes->fetch_assoc();
-            $userId = $row['user_id'];
-            if (!isset($_SESSION['role'])) {
-                $_SESSION['role'] = $row['role'];
-            }
-        } else {
-            // Failsafe if absolutely no users exist in the database
-            $conn->query("INSERT IGNORE INTO users (user_id, email, password, role) VALUES (1, 'fallback@system.com', '1234', 'Cashier')");
-            $userId = 1;
-            $_SESSION['role'] = 'Cashier';
-        }
+        echo json_encode(['success' => false, 'message' => 'Unauthorized. Please log in first.']);
+        exit;
     }
     $customerName = $conn->real_escape_string($data['customer'] ?? '');
     $contactNumber = $conn->real_escape_string($data['contact'] ?? '');
@@ -126,7 +114,7 @@ if ($method === 'POST') {
         }
         
         // Log activity
-        $role = $_SESSION['role'] ?? 'Cashier';
+        $role = $_SESSION['cashier_role'] ?? $_SESSION['admin_role'] ?? 'Cashier';
         $logSql = "INSERT INTO activity_log (user_id, role, action, details) VALUES ($userId, '$role', 'Placed Order', 'Order #$orderNum created for ₱$totalAmount')";
         $conn->query($logSql);
         

@@ -30,7 +30,6 @@ const PaymentView = (() => {
         document.getElementById('paymentChangeDisplay').style.color = '#c0392b';
         document.getElementById('customerName').value = '';
         document.getElementById('contactNo').value = '';
-        document.getElementById('lookupInput').value = '';
 
         // Reset payment method selection to Cash on load
         const paymentMethodSelect = document.getElementById('paymentMethod');
@@ -83,7 +82,21 @@ const PaymentView = (() => {
         });
 
         document.getElementById('btnConfirmPayment').onclick = _confirm;
-        document.getElementById('btnLookup').onclick = _lookup;
+
+        // Auto-capitalize first letter and restrict to letters only (no spaces, numbers, special chars)
+        document.getElementById('customerName').oninput = function() {
+            let v = this.value.replace(/[^a-zA-Z]/g, '');
+            if (v.length > 0) {
+                this.value = v.charAt(0).toUpperCase() + v.slice(1);
+            } else {
+                this.value = '';
+            }
+        };
+
+        // Numbers only, max 11 digits for contact
+        document.getElementById('contactNo').oninput = function() {
+            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);
+        };
     }
 
     function _updateChange() {
@@ -107,14 +120,6 @@ const PaymentView = (() => {
         _updateChange();
     }
 
-    function _lookup() {
-        const val = document.getElementById('lookupInput').value.trim();
-        if (!val) {
-            Swal.fire({ icon: 'info', title: 'Lookup', text: 'Enter a name or contact to search.', confirmButtonColor: '#2e4a6e' });
-            return;
-        }
-        Swal.fire({ icon: 'info', title: 'Not Found', text: `No returnee found for "${val}".`, confirmButtonColor: '#2e4a6e' });
-    }
 
     function _confirm() {
         const paid = parseFloat(_numStr) || 0;

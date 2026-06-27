@@ -49,7 +49,7 @@ const OrderView = (() => {
                     <div class="order-item-card-bottom">
                         <div class="order-item-qty-stepper">
                             <button class="qty-step-btn qty-step-minus" data-id="${item._id}">−</button>
-                            <input type="number" class="order-item-qty-input qty-step-input" min="1" value="${item.qty}" data-id="${item._id}" />
+                            <input type="text" inputmode="numeric" maxlength="3" class="order-item-qty-input qty-step-input" value="${item.qty}" data-id="${item._id}" autocomplete="off" />
                             <button class="qty-step-btn qty-step-plus" data-id="${item._id}">+</button>
                         </div>
                         <button class="order-item-remove-btn" data-id="${item._id}">Remove</button>
@@ -60,25 +60,54 @@ const OrderView = (() => {
                 row.querySelector('.qty-step-minus').addEventListener('click', () => {
                     const input = row.querySelector('.qty-step-input');
                     let val = parseInt(input.value) || 1;
-                    if (val > 1) { val--; input.value = val; onQtyChange(item._id, val); }
+                    if (val > 1) {
+                        val--;
+                        input.value = val;
+                        onQtyChange(item._id, val);
+                    }
+                    row.querySelector('.qty-step-minus').disabled = (val <= 1);
                 });
                 // Qty stepper plus
                 row.querySelector('.qty-step-plus').addEventListener('click', () => {
                     const input = row.querySelector('.qty-step-input');
-                    let val = parseInt(input.value) || 1;
-                    val++; input.value = val; onQtyChange(item._id, val);
+                    const QTY_MAX = 100;
+                    let val = parseInt(input.value) || 0;
+                    if (val >= QTY_MAX) return; // silently cap
+                    val++;
+                    input.value = val;
+                    onQtyChange(item._id, val);
+                    row.querySelector('.qty-step-minus').disabled = false;
                 });
-                // Keyboard input
+                // Block non-digit keys
                 const qtyInput = row.querySelector('.qty-step-input');
+                qtyInput.addEventListener('keydown', (e) => {
+                    const allowed = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Home','End'];
+                    if (allowed.includes(e.key)) return;
+                    if (!/^\d$/.test(e.key)) e.preventDefault();
+                });
+                // Live strip non-digits
                 qtyInput.addEventListener('input', () => {
-                    let val = parseInt(qtyInput.value);
-                    if (!isNaN(val) && val >= 1) onQtyChange(item._id, val);
+                    const stripped = qtyInput.value.replace(/[^0-9]/g, '');
+                    if (qtyInput.value !== stripped) qtyInput.value = stripped;
+                    let val = parseInt(stripped, 10);
+                    if (!isNaN(val) && val >= 1 && val <= 100) {
+                        onQtyChange(item._id, val);
+                        row.querySelector('.qty-step-minus').disabled = (val <= 1);
+                    }
                 });
                 qtyInput.addEventListener('blur', () => {
-                    let val = parseInt(qtyInput.value);
-                    if (isNaN(val) || val < 1) { val = 1; qtyInput.value = 1; }
+                    const QTY_MAX = 100;
+                    const trimmed = String(qtyInput.value).trim();
+                    let val = parseInt(trimmed, 10);
+                    // Any invalid input → restore to item qty
+                    if (!trimmed || isNaN(val) || val < 1) { val = item.qty; }
+                    if (val > QTY_MAX) { val = QTY_MAX; }
+                    qtyInput.value = val;
                     onQtyChange(item._id, val);
+                    row.querySelector('.qty-step-minus').disabled = (val <= 1);
                 });
+                // Initialise minus button state
+                row.querySelector('.qty-step-minus').disabled = (item.qty <= 1);
                 // Remove
                 row.querySelector('.order-item-remove-btn').addEventListener('click', () => onRemove(item._id));
 

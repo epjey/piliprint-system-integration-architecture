@@ -33,22 +33,52 @@
         document.getElementById('btnPlaceOrder').addEventListener('click', handlePlaceOrder);
         document.getElementById('btnPrintReceipt').addEventListener('click', handlePrintReceipt);
         document.getElementById('btnTransactionHistory').addEventListener('click', handleShowTransactionHistory);
-        document.getElementById('btnAdminLogin').addEventListener('click', () => { window.location.href = 'admin.php'; });
-        document.getElementById('btnExportCSV').addEventListener('click', handleExportCSV);
-
-        // Tap to Start overlay logic
-        const overlay = document.getElementById('tapToStartOverlay');
-        if (overlay) {
-            overlay.addEventListener('click', () => {
-                overlay.style.display = 'none';
+        document.getElementById('btnLogout').addEventListener('click', async () => {
+            const confirm = await Swal.fire({
+                title: 'Log out?',
+                text: 'Are you sure you want to log out of PiliPrint?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#DC2626',
+                cancelButtonColor: '#6B7280',
+                confirmButtonText: 'Yes, Log out',
             });
-        }
+            if (!confirm.isConfirmed) return;
+            const fd = new URLSearchParams();
+            fd.append('action', 'logout');
+            fd.append('role', 'Cashier');
+            await fetch('api/auth.php', { method: 'POST', body: fd });
+            window.location.href = 'view/auth/login.php';
+        });
 
         // 4. Start Navbar Datetime ticker
         startDatetimeTicker();
 
         // 5. Auto-sync services from database every 5 seconds (Ajax polling)
         setInterval(async () => {
+            // Check if account was deactivated
+            try {
+                const fd = new URLSearchParams();
+                fd.append('action', 'check_status');
+                fd.append('role', 'Cashier');
+                const authRes = await fetch('api/auth.php', { method: 'POST', body: fd });
+                const authData = await authRes.json();
+                if (authData.inactive) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Account Deactivated',
+                        text: 'Your account has been deactivated by the administrator.',
+                        confirmButtonColor: '#DC2626',
+                        allowOutsideClick: false
+                    }).then(() => {
+                        window.location.href = 'view/auth/login.php';
+                    });
+                    return; // Stop execution
+                }
+            } catch (e) {
+                console.error('Failed to check status', e);
+            }
+
             const oldServicesData = JSON.stringify(ServiceModel.getAll());
             await ServiceModel.loadServices(false);
             const newServicesData = JSON.stringify(ServiceModel.getAll());
@@ -163,8 +193,9 @@
                 // Show receipt in a modal
                 showReceiptModal(txn);
 
-                // Reset order view and show receipt details in order preview
-                updateOrderDisplay(txn);
+                // Clear the order and reset the receipt preview to blank
+                OrderModel.clearOrder();
+                updateOrderDisplay();
             } else {
                 Swal.fire('Error', 'Failed to save transaction to database.', 'error');
             }
@@ -220,41 +251,6 @@
         printWindow.close();
     }
 
-    // Export transaction history to CSV
-    function handleExportCSV() {
-        const txns = OrderModel.getTransactions();
-        if (txns.length === 0) {
-            Swal.fire({
-                icon: 'info',
-                title: 'No Transactions',
-                text: 'There are no transactions available to export.',
-                confirmButtonColor: '#2e4a6e'
-            });
-            return;
-        }
-
-        // CSV Headers
-        let csv = "Order #,Items Summary,Customer,Total (PHP),Date & Time\n";
-
-        txns.forEach(t => {
-            const orderNum = `"${t.orderNum.replace(/"/g, '""')}"`;
-            const itemsSummary = `"${t.items.map(item => `${item.serviceName} (${item.qty}x)`).join(', ').replace(/"/g, '""')}"`;
-            const customer = `"${(t.customer || 'Walk-in').replace(/"/g, '""')}"`;
-            const total = `"${t.total.toFixed(2)}"`;
-            const dateTime = `"${t.date} ${t.time}"`;
-            csv += `${orderNum},${itemsSummary},${customer},${total},${dateTime}\n`;
-        });
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `piliprint_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
 
     // Show transaction history modal
     async function handleShowTransactionHistory() {

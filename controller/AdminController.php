@@ -9,6 +9,7 @@
     let currentAdminServiceId = null;
     let currentAdminTab = 'variants';
     let currentAdminNavTarget = 'dashboard';
+    let adminActivityLogsState = [];
 
     document.addEventListener('DOMContentLoaded', async () => {
         await initAdmin();
@@ -675,7 +676,12 @@
             simVariantBtns.forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const varId = e.currentTarget.getAttribute('data-id');
-                    window.pricingSimulationState.selectedVariantId = varId;
+                    if (window.pricingSimulationState.selectedVariantId == varId) {
+                        // toggle off
+                        window.pricingSimulationState.selectedVariantId = null;
+                    } else {
+                        window.pricingSimulationState.selectedVariantId = varId;
+                    }
                     updatePricingSimulationUI(bodyEl, currentService);
                 });
             });
@@ -685,7 +691,12 @@
                 btn.addEventListener('click', (e) => {
                     const grpId = e.currentTarget.getAttribute('data-group-id');
                     const optId = e.currentTarget.getAttribute('data-option-id');
-                    window.pricingSimulationState.selectedOptionIds[grpId] = optId;
+                    if (window.pricingSimulationState.selectedOptionIds[grpId] == optId) {
+                        // toggle off
+                        delete window.pricingSimulationState.selectedOptionIds[grpId];
+                    } else {
+                        window.pricingSimulationState.selectedOptionIds[grpId] = optId;
+                    }
                     updatePricingSimulationUI(bodyEl, currentService);
                 });
             });
@@ -736,6 +747,7 @@
                     }).then(async () => {
                         const fd = new URLSearchParams();
                         fd.append('action', 'logout');
+                        fd.append('role', 'Admin');
                         await fetch('api/auth.php', { method: 'POST', body: fd });
                         window.location.href = 'view/auth/login.php';
                     });
@@ -792,6 +804,30 @@
                     }
                 }
             }
+
+            // Poll Activity Logs ONLY if on that tab
+            if (currentAdminNavTarget === 'activity-log') {
+                try {
+                    const res = await fetch('api/activity_logs.php');
+                    const data = await res.json();
+                    if (data.success) {
+                        const newLogsData = JSON.stringify(data.logs);
+                        const oldLogsData = JSON.stringify(adminActivityLogsState);
+                        if (oldLogsData !== newLogsData) {
+                            adminActivityLogsState = data.logs;
+                            const bodyEl = document.getElementById('adminContentBody');
+                            if (bodyEl) {
+                                if ($.fn.DataTable.isDataTable('#activityLogTable')) {
+                                    $('#activityLogTable').DataTable().destroy();
+                                }
+                                AdminView.renderActivityLog(bodyEl, adminActivityLogsState);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Polling activity logs failed', e);
+                }
+            }
         }, 5000);
     }
 
@@ -822,7 +858,35 @@
             AdminView.renderReports(bodyEl);
         } else if (target === 'activity-log') {
             headerEl.textContent = 'Activity Log';
-            AdminView.renderActivityLog(bodyEl);
+            bodyEl.innerHTML = '<div style="padding:20px;color:#64748B;">Loading logs...</div>';
+            try {
+                const res = await fetch('api/activity_logs.php');
+                const data = await res.json();
+                if (data.success) {
+                    adminActivityLogsState = data.logs;
+                    AdminView.renderActivityLog(bodyEl, data.logs);
+                } else {
+                    bodyEl.innerHTML = '<div style="padding:20px;color:#EF4444;">Failed to load logs.</div>';
+                }
+            } catch (e) {
+                console.error(e);
+                bodyEl.innerHTML = '<div style="padding:20px;color:#EF4444;">Error loading logs.</div>';
+            }
+        } else if (target === 'manage-users') {
+            headerEl.textContent = 'Manage Users';
+            bodyEl.innerHTML = '<div style="padding:20px;color:#64748B;">Loading users...</div>';
+            try {
+                const res = await fetch('api/users.php');
+                const data = await res.json();
+                if (data.success) {
+                    AdminView.renderUsers(bodyEl, data.users);
+                } else {
+                    bodyEl.innerHTML = '<div style="padding:20px;color:#EF4444;">Failed to load users.</div>';
+                }
+            } catch (e) {
+                console.error(e);
+                bodyEl.innerHTML = '<div style="padding:20px;color:#EF4444;">Error loading users.</div>';
+            }
         }
     }
 

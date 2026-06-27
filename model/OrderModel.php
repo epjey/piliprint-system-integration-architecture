@@ -44,7 +44,7 @@ const OrderModel = (() => {
     function updateQty(_id, qty) {
         const item = currentOrder.find(i => i._id === _id);
         if (item) {
-            item.qty = qty;
+            item.qty = Math.max(1, parseInt(qty) || 1);
         }
     }
 

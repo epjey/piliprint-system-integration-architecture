@@ -1,4 +1,11 @@
-
+<?php
+session_start();
+if (!isset($_SESSION['cashier_user_id']) || $_SESSION['cashier_role'] !== 'Cashier') {
+    header('Location: view/auth/login.php');
+    exit;
+}
+$cashierEmail = $_SESSION['cashier_email'] ?? 'Cashier';
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -18,20 +25,6 @@
 
 <body>
 
-    <!-- Tap to Start Overlay -->
-    <div id="tapToStartOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.98);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;cursor:pointer;">
-        <style>
-            @keyframes pulseOverlay {
-                0% { opacity: 1; transform: scale(1); }
-                50% { opacity: 0.7; transform: scale(1.05); }
-                100% { opacity: 1; transform: scale(1); }
-            }
-        </style>
-        <img src="assets/logo/logo.png" alt="Logo" style="height:150px;margin-bottom:20px;border-radius:12px;" />
-        <h1 style="font-weight:700;font-size:3.5rem;margin:0;">PiliPrint</h1>
-        <p style="font-size:1.5rem;color:#94A3B8;margin-bottom:50px;">Professional Printing Services</p>
-        <div style="font-size:2rem;font-weight:600;color:#38BDF8;animation: pulseOverlay 2s infinite;">TAP ANYWHERE TO START</div>
-    </div>
 
     <!-- ===== NAVBAR ===== -->
     <nav class="pos-navbar">
@@ -50,7 +43,14 @@
         <div style="display:flex;align-items:center;gap:8px;">
             <div class="navbar-datetime" id="navDatetime"></div>
             <button class="btn btn-txn-history" id="btnTransactionHistory">Transaction History</button>
-            <button class="btn btn-logout" id="btnAdminLogin" style="background:#1E293B;">Admin Login</button>
+            <div style="display:flex;align-items:center;gap:6px;background:#1E293B;border-radius:8px;padding:6px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span style="color:#CBD5E1;font-size:0.8rem;font-weight:500;"><?php echo htmlspecialchars($cashierEmail); ?></span>
+            </div>
+            <button class="btn btn-logout" id="btnLogout" style="background:#DC2626;border-color:#DC2626;display:flex;align-items:center;gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Logout
+            </button>
         </div>
     </nav>
 
@@ -161,14 +161,7 @@
                 </div>
 
                 <div class="modal-body" style="padding:16px 20px 8px;">
-                    <!-- Lookup row -->
-                    <div class="row mb-2 align-items-center g-2">
-                        <label class="col-auto payment-label" style="width:130px;">Lookup Returnee:</label>
-                        <div class="col d-flex gap-2">
-                            <input type="text" class="form-control form-control-sm" id="lookupInput" />
-                            <button class="btn-lookup" id="btnLookup">Lookup</button>
-                        </div>
-                    </div>
+
                     <div class="row mb-2 align-items-center g-2">
                         <label class="col-auto payment-label" style="width:130px;">Customer Name:</label>
                         <div class="col"><input type="text" class="form-control form-control-sm" id="customerName" />
@@ -176,7 +169,7 @@
                     </div>
                     <div class="row mb-2 align-items-center g-2">
                         <label class="col-auto payment-label" style="width:130px;">Contact No:</label>
-                        <div class="col"><input type="text" class="form-control form-control-sm" id="contactNo" /></div>
+                        <div class="col"><input type="tel" class="form-control form-control-sm" id="contactNo" maxlength="11" inputmode="numeric" pattern="[0-9]*" /></div>
                     </div>
 
                     <div class="payment-total-text">Total Amount: <span id="paymentTotalAmt">P 0.00</span></div>
@@ -232,7 +225,7 @@
     </div>
 
     <!-- ===== RECEIPT MODAL ===== -->
-    <div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
         <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
             <div class="modal-content pos-modal">
                 <div class="pos-modal-header">
@@ -253,9 +246,6 @@
                 <div class="pos-modal-header d-flex justify-content-between align-items-center">
                     <h5 class="modal-title">Transaction History</h5>
                     <div style="display:flex; gap:10px; align-items:center;">
-                        <button class="btn btn-sm btn-success" id="btnExportCSV"
-                            style="background-color: #10B981; border-color: #10B981; font-size: 0.8rem; padding: 5px 12px; font-weight: 600;">Export
-                            CSV</button>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" style="margin: 0;"></button>
                     </div>
                 </div>

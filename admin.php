@@ -1,10 +1,10 @@
 <?php
 session_start();
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['admin_user_id'])) {
     header("Location: view/auth/login.php");
     exit;
 }
-if ($_SESSION['role'] !== 'Admin') {
+if ($_SESSION['admin_role'] !== 'Admin') {
     header("Location: index.php");
     exit;
 }
@@ -88,6 +88,15 @@ if ($_SESSION['role'] !== 'Admin') {
                     </svg>
                     Activity Log
                 </li>
+                <li class="admin-nav-item" data-target="manage-users">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    Manage Users
+                </li>
             </ul>
 
             <!-- Logout pinned at bottom -->
@@ -128,9 +137,138 @@ if ($_SESSION['role'] !== 'Admin') {
     <!-- Chart.js -->
     <script src="assets/chart.js/chart.umd.min.js"></script>
 
+    <!-- ===== MANAGE USERS MODALS ===== -->
+
+    <!-- Add Cashier Modal -->
+    <div class="modal fade" id="addCashierModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:460px;">
+            <div class="modal-content" style="border-radius:12px;border:none;box-shadow:0 20px 60px rgba(0,0,0,0.15);">
+                <div class="modal-header" style="background:#0F172A;color:#fff;border-radius:12px 12px 0 0;padding:18px 24px;border-bottom:none;">
+                    <h5 class="modal-title" style="font-weight:700;font-size:1rem;display:flex;align-items:center;gap:10px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+                        Add Cashier
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="padding:24px;">
+                    <div class="mb-3">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">Email Address <span style="color:#EF4444;">*</span></label>
+                        <input type="email" id="addEmail" class="form-control" placeholder="cashier@piliprint.com" style="border-radius:8px;border:1px solid #D1D5DB;padding:10px 14px;font-size:0.9rem;" />
+                    </div>
+                    <div class="mb-3">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">Password <span style="color:#EF4444;">*</span></label>
+                        <input type="password" id="addPassword" class="form-control" placeholder="Enter password" style="border-radius:8px;border:1px solid #D1D5DB;padding:10px 14px;font-size:0.9rem;" />
+                    </div>
+                    <div class="mb-3">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">Confirm Password <span style="color:#EF4444;">*</span></label>
+                        <input type="password" id="addConfirmPassword" class="form-control" placeholder="Repeat password" style="border-radius:8px;border:1px solid #D1D5DB;padding:10px 14px;font-size:0.9rem;" />
+                    </div>
+                    <div class="mb-1">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">Status</label>
+                        <select id="addStatus" class="form-select" style="border-radius:8px;border:1px solid #D1D5DB;padding:10px 14px;font-size:0.9rem;">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 14px;margin-top:14px;font-size:0.8rem;color:#15803D;">
+                        <strong>Note:</strong> New accounts are always created with the <strong>Cashier</strong> role.
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding:16px 24px;border-top:1px solid #F1F5F9;gap:8px;">
+                    <button class="btn" data-bs-dismiss="modal" style="background:#F1F5F9;color:#374151;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:0.88rem;">Cancel</button>
+                    <button class="btn" id="btnSaveAddCashier" style="background:#F97316;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:0.88rem;">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Cashier Modal -->
+    <div class="modal fade" id="editCashierModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:460px;">
+            <div class="modal-content" style="border-radius:12px;border:none;box-shadow:0 20px 60px rgba(0,0,0,0.15);">
+                <div class="modal-header" style="background:#0F172A;color:#fff;border-radius:12px 12px 0 0;padding:18px 24px;border-bottom:none;">
+                    <h5 class="modal-title" style="font-weight:700;font-size:1rem;display:flex;align-items:center;gap:10px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        Edit Cashier
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="padding:24px;">
+                    <input type="hidden" id="editUserId" />
+                    <div class="mb-3">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">Role</label>
+                        <input type="text" class="form-control" value="Cashier" disabled style="border-radius:8px;background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;padding:10px 14px;" />
+                    </div>
+                    <div class="mb-3">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">Email Address <span style="color:#EF4444;">*</span></label>
+                        <input type="email" id="editEmail" class="form-control" placeholder="cashier@piliprint.com" style="border-radius:8px;border:1px solid #D1D5DB;padding:10px 14px;font-size:0.9rem;" />
+                    </div>
+                    <div class="mb-1">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">Status</label>
+                        <select id="editStatus" class="form-select" style="border-radius:8px;border:1px solid #D1D5DB;padding:10px 14px;font-size:0.9rem;">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding:16px 24px;border-top:1px solid #F1F5F9;gap:8px;">
+                    <button class="btn" data-bs-dismiss="modal" style="background:#F1F5F9;color:#374151;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:0.88rem;">Cancel</button>
+                    <button class="btn" id="btnSaveEditCashier" style="background:#1D4ED8;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:0.88rem;">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+            <div class="modal-content" style="border-radius:12px;border:none;box-shadow:0 20px 60px rgba(0,0,0,0.15);">
+                <div class="modal-header" style="background:#D97706;color:#fff;border-radius:12px 12px 0 0;padding:18px 24px;border-bottom:none;">
+                    <h5 class="modal-title" style="font-weight:700;font-size:1rem;display:flex;align-items:center;gap:10px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Reset Cashier Password
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="padding:24px;">
+                    <input type="hidden" id="resetUserId" />
+                    <p style="font-size:0.85rem;color:#64748B;margin-bottom:16px;">You are resetting the password for: <strong id="resetUserEmail" style="color:#0F172A;"></strong></p>
+                    <div class="mb-3">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">New Password <span style="color:#EF4444;">*</span></label>
+                        <input type="password" id="resetNewPassword" class="form-control" placeholder="Enter new password" style="border-radius:8px;border:1px solid #D1D5DB;padding:10px 14px;font-size:0.9rem;" />
+                    </div>
+                    <div class="mb-1">
+                        <label style="font-size:0.82rem;font-weight:600;color:#374151;margin-bottom:5px;display:block;">Confirm Password <span style="color:#EF4444;">*</span></label>
+                        <input type="password" id="resetConfirmPassword" class="form-control" placeholder="Repeat new password" style="border-radius:8px;border:1px solid #D1D5DB;padding:10px 14px;font-size:0.9rem;" />
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding:16px 24px;border-top:1px solid #F1F5F9;gap:8px;">
+                    <button class="btn" data-bs-dismiss="modal" style="background:#F1F5F9;color:#374151;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:0.88rem;">Cancel</button>
+                    <button class="btn" id="btnSaveResetPassword" style="background:#D97706;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:0.88rem;">Reset Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ADMIN RECEIPT MODAL ===== -->
+    <div class="modal fade" id="adminReceiptModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+            <div class="modal-content pos-modal">
+                <div class="pos-modal-header">
+                    <h5 class="modal-title" id="adminReceiptModalTitle">Receipt – #0000</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="receipt-modal-sub" id="adminReceiptModalSub">Transaction #0000</div>
+                <pre class="receipt-modal-body" id="adminReceiptModalBody"></pre>
+                <button class="btn-receipt-close" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Admin Scripts (PHP-included) -->
     <?php include 'model/ServiceModel.php'; ?>
     <?php include 'model/OrderModel.php'; ?>
+    <?php include 'view/OrderView.php'; ?>
     <?php include 'view/AdminView.php'; ?>
     <?php include 'controller/AdminController.php'; ?>
 </body>

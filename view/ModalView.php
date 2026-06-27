@@ -83,11 +83,17 @@ const ModalView = (() => {
                 card.className = 'variant-card' + (_state.selectedVariant && _state.selectedVariant.id === v.id ? ' selected' : '');
                 card.textContent = v.label + (v.price > 0 ? '  ₱' + v.price.toFixed(2) : '  ₱' + v.price.toFixed(2));
                 card.addEventListener('click', () => {
-                    _state.selectedVariant = v;
-                    // reset options
-                    _state.selectedOptions = {};
-                    document.querySelectorAll('.variant-card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
+                    if (_state.selectedVariant && _state.selectedVariant.id === v.id) {
+                        // deselect
+                        _state.selectedVariant = null;
+                        _state.selectedOptions = {};
+                        card.classList.remove('selected');
+                    } else {
+                        _state.selectedVariant = v;
+                        _state.selectedOptions = {};
+                        document.querySelectorAll('.variant-card').forEach(c => c.classList.remove('selected'));
+                        card.classList.add('selected');
+                    }
                     _updateItemTotal();
                 });
                 grid.appendChild(card);
@@ -127,28 +133,25 @@ const ModalView = (() => {
             });
             body.innerHTML = html;
 
-            // Pre-select first option per group if none chosen
-            groups.forEach(g => {
-                if (!_state.selectedOptions[g.id]) {
-                    const firstOpt = g.options[0];
-                    if (firstOpt) {
-                        _state.selectedOptions[g.id] = { optionId: firstOpt.id, optionLabel: firstOpt.label, price: firstOpt.price, groupLabel: g.label };
-                        body.querySelector(`[data-gid="${g.id}"][data-optid="${firstOpt.id}"]`)?.classList.add('selected');
-                    }
-                }
-            });
 
             body.querySelectorAll('.option-card').forEach(card => {
                 card.addEventListener('click', () => {
                     const gid = card.dataset.gid;
-                    body.querySelectorAll(`[data-gid="${gid}"]`).forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
-                    _state.selectedOptions[gid] = {
-                        optionId: card.dataset.optid,
-                        optionLabel: card.dataset.olabel,
-                        price: parseFloat(card.dataset.price) || 0,
-                        groupLabel: card.dataset.glabel,
-                    };
+                    const alreadySelected = _state.selectedOptions[gid] && _state.selectedOptions[gid].optionId === card.dataset.optid;
+                    if (alreadySelected) {
+                        // deselect
+                        card.classList.remove('selected');
+                        delete _state.selectedOptions[gid];
+                    } else {
+                        body.querySelectorAll(`[data-gid="${gid}"]`).forEach(c => c.classList.remove('selected'));
+                        card.classList.add('selected');
+                        _state.selectedOptions[gid] = {
+                            optionId: card.dataset.optid,
+                            optionLabel: card.dataset.olabel,
+                            price: parseFloat(card.dataset.price) || 0,
+                            groupLabel: card.dataset.glabel,
+                        };
+                    }
                     _updateItemTotal();
                 });
             });
@@ -164,18 +167,69 @@ const ModalView = (() => {
             const optKeys = Object.values(_state.selectedOptions).map(o => o.optionLabel).join(' · ');
             body.innerHTML = `
         <div class="qty-summary-box">
-          <div class="qty-summary-title">${_state.service.label} — ${_state.selectedVariant.label}</div>
-          <div class="qty-summary-sub">Base ₱${_state.selectedVariant.price.toFixed(2)} · ${optKeys || 'No options'}</div>
+          <div class="qty-summary-title">${_state.service.label} — ${_state.selectedVariant ? _state.selectedVariant.label : 'No variant selected'}</div>
+          <div class="qty-summary-sub">Base ₱${_state.selectedVariant ? _state.selectedVariant.price.toFixed(2) : '0.00'} · ${optKeys || 'No options'}</div>
         </div>
         <div class="qty-counter">
           <button class="qty-btn minus" id="qtyMinus">−</button>
-          <input type="number" class="qty-display" id="qtyInput" min="1" value="${_state.qty}" />
+          <input type="text" inputmode="numeric" class="qty-display" id="qtyInput" maxlength="3" value="${_state.qty}" autocomplete="off" />
           <button class="qty-btn plus" id="qtyPlus">+</button>
         </div>
         <div class="qty-unit">copies / sets</div>
+        <div id="qtyError" style="color:#EF4444;font-size:0.8rem;text-align:center;margin-top:6px;min-height:18px;"></div>
       `;
 
-            const qtyInput = document.getElementById('qtyInput');
+            const qtyInput  = document.getElementById('qtyInput');
+            const qtyError  = document.getElementById('qtyError');
+            const QTY_MAX   = 100;
+
+            function showQtyError(msg) {
+                qtyError.textContent = msg;
+            }
+            function clearQtyError() {
+                qtyError.textContent = '';
+            }
+
+            // Returns parsed integer or null + sets error message
+            function parseAndValidate(raw) {
+                const trimmed = String(raw).trim();
+                if (trimmed === '') { showQtyError('Quantity is required.'); return null; }
+                if (!/^\d+$/.test(trimmed)) { showQtyError('Quantity must be a whole number — no letters, decimals, or special characters.'); return null; }
+                const n = parseInt(trimmed, 10);
+                if (n === 0)         { showQtyError('Quantity cannot be zero.'); return null; }
+                if (n > QTY_MAX)     { showQtyError(`Quantity cannot exceed ${QTY_MAX}.`); return null; }
+                clearQtyError();
+                return n;
+            }
+
+            // Block keys that can never form a valid integer
+            qtyInput.addEventListener('keydown', (e) => {
+                const allowed = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Home','End'];
+                if (allowed.includes(e.key)) return;
+                if (!/^\d$/.test(e.key)) { e.preventDefault(); }
+            });
+
+            // Live strip: remove anything that isn't a digit
+            qtyInput.addEventListener('input', () => {
+                const stripped = qtyInput.value.replace(/[^0-9]/g, '');
+                if (qtyInput.value !== stripped) qtyInput.value = stripped;
+                const n = parseAndValidate(qtyInput.value);
+                if (n !== null) { _state.qty = n; _updateItemTotal(); }
+            });
+
+            // On blur: normalise leading zeros, clamp, commit
+            qtyInput.addEventListener('blur', () => {
+                const n = parseAndValidate(qtyInput.value);
+                if (n === null) {
+                    qtyInput.value = _state.qty; // restore last valid
+                    clearQtyError();
+                } else {
+                    const clamped = Math.min(n, QTY_MAX);
+                    qtyInput.value = clamped;
+                    _state.qty = clamped;
+                    _updateItemTotal();
+                }
+            });
 
             document.getElementById('qtyMinus').addEventListener('click', () => {
                 let val = parseInt(qtyInput.value) || 1;
@@ -183,30 +237,22 @@ const ModalView = (() => {
                     val--;
                     qtyInput.value = val;
                     _state.qty = val;
+                    clearQtyError();
                     _updateItemTotal();
                 }
             });
+
             document.getElementById('qtyPlus').addEventListener('click', () => {
-                let val = parseInt(qtyInput.value) || 1;
+                const QTY_MAX = 100;
+                let val = parseInt(qtyInput.value) || 0;
+                if (val >= QTY_MAX) {
+                    showQtyError(`Quantity cannot exceed ${QTY_MAX}.`);
+                    return;
+                }
                 val++;
                 qtyInput.value = val;
                 _state.qty = val;
-                _updateItemTotal();
-            });
-            qtyInput.addEventListener('input', () => {
-                let val = parseInt(qtyInput.value);
-                if (!isNaN(val) && val >= 1) {
-                    _state.qty = val;
-                    _updateItemTotal();
-                }
-            });
-            qtyInput.addEventListener('blur', () => {
-                let val = parseInt(qtyInput.value);
-                if (isNaN(val) || val < 1) {
-                    val = 1;
-                    qtyInput.value = 1;
-                }
-                _state.qty = val;
+                clearQtyError();
                 _updateItemTotal();
             });
 
@@ -218,6 +264,16 @@ const ModalView = (() => {
             nextBtn.textContent = 'Add to Order';
             nextBtn.className = 'btn btn-modal-next add-btn';
             nextBtn.onclick = () => {
+                const n = parseAndValidate(qtyInput.value);
+                if (n === null) {
+                    Swal.fire({ icon: 'warning', title: 'Invalid Quantity', text: qtyError.textContent, confirmButtonColor: '#2e4a6e' });
+                    return;
+                }
+                if (!_state.selectedVariant) {
+                    Swal.fire({ icon: 'warning', title: 'No Variant Selected', text: 'Please go back and select a variant.', confirmButtonColor: '#2e4a6e' });
+                    return;
+                }
+                _state.qty = n;
                 const options = Object.values(_state.selectedOptions).map(o => ({
                     groupLabel: o.groupLabel,
                     optionLabel: o.optionLabel,

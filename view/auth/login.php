@@ -1,9 +1,5 @@
 <?php
 session_start();
-if (isset($_SESSION['user_id'])) {
-    header("Location: ../../" . ($_SESSION['role'] === 'Admin' ? 'admin.php' : 'index.php'));
-    exit;
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
