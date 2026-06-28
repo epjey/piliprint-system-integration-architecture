@@ -22,9 +22,8 @@ if ($method === 'POST') {
             exit;
         }
 
-
-        // Since user manually inserted raw '1234', we match raw text for now
-        $sql = "SELECT user_id, role, password, status FROM users WHERE email = '$email'";
+        // Strict case-sensitive email match using BINARY
+        $sql = "SELECT user_id, role, password, status FROM users WHERE BINARY email = '$email'";
         $result = $conn->query($sql);
 
         if ($result && $result->num_rows > 0) {

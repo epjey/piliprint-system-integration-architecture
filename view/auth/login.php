@@ -3,12 +3,17 @@ session_start();
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PiliPrint — Login</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       font-family: Arial, sans-serif;
@@ -100,8 +105,13 @@ session_start();
       transition: border-color 0.2s;
     }
 
-    input:focus { border-color: #06B6D4; }
-    input::placeholder { color: #475569; }
+    input:focus {
+      border-color: #06B6D4;
+    }
+
+    input::placeholder {
+      color: #475569;
+    }
 
     .btn-signin {
       width: 100%;
@@ -119,13 +129,19 @@ session_start();
       transition: background 0.2s;
     }
 
-    .btn-signin:hover { background: #0891B2; }
-    .btn-signin:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-signin:hover {
+      background: #0891B2;
+    }
+
+    .btn-signin:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
 
     .error {
       display: none;
-      background: rgba(239,68,68,0.1);
-      border: 1px solid rgba(239,68,68,0.3);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
       color: #FCA5A5;
       font-size: 0.8rem;
       padding: 9px 12px;
@@ -133,7 +149,10 @@ session_start();
       margin-bottom: 14px;
       text-align: center;
     }
-    .error.show { display: block; }
+
+    .error.show {
+      display: block;
+    }
 
     .footer {
       background: #1E293B;
@@ -144,13 +163,16 @@ session_start();
       font-size: 0.72rem;
     }
 
-    .footer span { color: #EA580C; }
+    .footer span {
+      color: #EA580C;
+    }
   </style>
 </head>
+
 <body>
 
   <div class="topbar">
-    <img src="../../assets/logo/loginlogo.png" alt="PiliPrint loginLogo"/>
+    <img src="../../assets/logo/loginlogo.png" alt="PiliPrint loginLogo" />
     <div class="topbar-brand">
       <strong>PiliPrint</strong>
       <small>Printing Services</small>
@@ -159,17 +181,21 @@ session_start();
 
   <div class="main">
     <div class="card">
-      <img src="../../assets/logo/loginlogo.png" alt="PiliPrint loginLogo"/>
+      <img src="../../assets/logo/loginlogo.png" alt="PiliPrint loginLogo" />
       <h1>PiliPrint</h1>
 
       <div class="error" id="errorMsg"></div>
 
       <form id="loginForm">
         <label for="email">Email</label>
-        <input type="email" id="email" name="email" placeholder="Enter your email" required/>
+        <input type="text" id="email" name="email" placeholder="Enter your email" autocomplete="username"
+          autocapitalize="none" spellcheck="false" maxlength="100" required />
+        <div id="emailError"
+          style="display:none;color:#FCA5A5;font-size:0.75rem;text-align:left;margin-top:-10px;margin-bottom:10px;">
+        </div>
 
         <label for="password">Password</label>
-        <input type="password" id="password" name="password" placeholder="Enter your password" required/>
+        <input type="password" id="password" name="password" placeholder="Enter your password" required />
 
         <button type="submit" class="btn-signin" id="loginBtn">Sign In</button>
       </form>
@@ -180,43 +206,78 @@ session_start();
     &copy; 2026 <span>PiliPrint</span> — Printing Services. All rights reserved.
   </div>
 
-<script>
-  document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('loginBtn');
-    const err = document.getElementById('errorMsg');
+  <script>
+    const emailInput = document.getElementById('email');
+    const emailError = document.getElementById('emailError');
 
-    btn.textContent = 'Signing in...';
-    btn.disabled = true;
-    err.classList.remove('show');
+    // Allowed characters in an email: letters, digits, and: @ . _ + - 
+    emailInput.addEventListener('input', () => {
+      // Strip anything that can never appear in a valid email
+      const cleaned = emailInput.value.replace(/[^a-zA-Z0-9@._+\-]/g, '');
+      if (emailInput.value !== cleaned) emailInput.value = cleaned;
 
-    const fd = new URLSearchParams();
-    fd.append('action', 'login');
-    fd.append('email', document.getElementById('email').value);
-    fd.append('password', document.getElementById('password').value);
+      // Allow only one '@'
+      const atCount = (emailInput.value.match(/@/g) || []).length;
+      if (atCount > 1) {
+        emailInput.value = emailInput.value.replace(/@(?=.*@)/g, '');
+      }
 
-    try {
-      const res = await fetch('../../api/auth.php', {
-        method: 'POST',
-        body: fd
-      });
-      const data = await res.json();
+      // Clear error while user is actively fixing the field
+      emailError.style.display = 'none';
+    });
 
-      if (data.success) {
-        window.location.href = '../../' + data.redirect;
-      } else {
-        err.textContent = data.message;
+    function isValidEmail(val) {
+      // Strict pattern: local@domain.tld — no leading/trailing dots/hyphens in local part
+      return /^[a-zA-Z0-9][a-zA-Z0-9._+\-]*@[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)*\.[a-zA-Z]{2,}$/.test(val);
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('errorMsg');
+
+      const rawEmail = emailInput.value.trim();
+
+      // Frontend guard before even hitting the server
+      if (!isValidEmail(rawEmail)) {
+        emailError.textContent = 'Please enter a valid email address (e.g. user@gmail.com).';
+        emailError.style.display = 'block';
+        return;
+      }
+      emailError.style.display = 'none';
+
+      btn.textContent = 'Signing in...';
+      btn.disabled = true;
+      err.classList.remove('show');
+
+      const fd = new URLSearchParams();
+      fd.append('action', 'login');
+      fd.append('email', rawEmail);
+      fd.append('password', document.getElementById('password').value);
+
+      try {
+        const res = await fetch('../../api/auth.php', {
+          method: 'POST',
+          body: fd
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          window.location.href = '../../' + data.redirect;
+        } else {
+          err.textContent = data.message;
+          err.classList.add('show');
+          btn.textContent = 'Sign In';
+          btn.disabled = false;
+        }
+      } catch (e) {
+        err.textContent = 'Network error occurred.';
         err.classList.add('show');
         btn.textContent = 'Sign In';
         btn.disabled = false;
       }
-    } catch(e) {
-      err.textContent = 'Network error occurred.';
-      err.classList.add('show');
-      btn.textContent = 'Sign In';
-      btn.disabled = false;
-    }
-  });
-</script>
+    });
+  </script>
 </body>
+
 </html>
